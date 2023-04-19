@@ -1,0 +1,165 @@
+{
+  "name": "nokia-wfm",
+  "displayName": "NOKIA_WFM",
+  "description": "NOKIA WFM vsCode Developer Plugin",
+  "version": "0.0.1",
+  "icon": "media/Nokia_WFM.png",
+  "publisher": "NokiaAutomatION",
+  "engines": {
+    "vscode": "^1.76.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onFileSystem:wfm",
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "snippets": [
+      {
+        "language": "yaml",
+        "path": "./schema/snippets.json"
+      }
+    ],
+    "configuration": {
+      "title": "WorkflowManager",
+      "properties": {
+        "workflowManager.server": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "format": "ipv4",
+          "description": "NSP server address"
+        },
+        "workflowManager.username": {
+          "type": "string",
+          "default": "username",
+          "description": "NSP username"
+        },
+        "workflowManager.password": {
+          "type": "string",
+          "default": "password",
+          "description": "NSP password"
+        },
+        "workflowManager.localStorage.enable": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow local storage"
+        },
+        "workflowManager.localStorage.folder": {
+          "type": "string",
+          "default": "/tmp/",
+          "description": "Local storage folder"
+        }
+      }
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "when": "resourceScheme != wfm && resourceLangId == yaml",
+          "command": "nokia-wfm.upload",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceScheme != wfm && resourceLangId == yaml",
+          "command": "nokia-wfm.applySchema",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceLangId == yaml",
+          "command": "nokia-wfm.openInBrowser",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceLangId == yaml && resource =~ /^(?!.*wfm:\\/actions\\/).*$/",
+          "command": "nokia-wfm.lastResult",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceLangId == yaml",
+          "command": "nokia-wfm.validate",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceLangId == yaml && resource =~ /^(?!.*wfm:\\/actions\\/).*$/",
+          "command": "nokia-wfm.execute",
+          "group": "navigation"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "nokia-wfm.execute",
+        "category": "WFM",
+        "title": "Execute Workflow",
+        "icon": "$(run)"
+      },
+      {
+        "command": "nokia-wfm.applySchema",
+        "category": "WFM",
+        "title": "Apply Schema for Validation",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "nokia-wfm.lastResult",
+        "category": "WFM",
+        "title": "Last Execution Result",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "nokia-wfm.validate",
+        "category": "WFM",
+        "title": "Validate Definition",
+        "icon": "$(pass)"
+      },
+      {
+        "command": "nokia-wfm.upload",
+        "category": "WFM",
+        "title": "Upload",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "nokia-wfm.openInBrowser",
+        "category": "WFM",
+        "title": "Open in Browser",
+        "icon": "$(home)"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run esbuild-base -- --minify",
+    "build": "./node_modules/typescript/bin/tsc",
+    "compile": "./node_modules/typescript/bin/tsc -p ./",
+    "watch": "./node_modules/typescript/bin/tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node --packages=external",
+    "esbuild": "npm run esbuild-base -- --sourcemap",
+    "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
+    "test-compile": "./node_modules/typescript/bin/tsc -p ./"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.0.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "16.x",
+    "@types/vscode": "^1.76.0",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "@vscode/test-electron": "^2.2.0",
+    "esbuild": "^0.17.11",
+    "eslint": "^8.28.0",
+    "glob": "^8.0.3",
+    "mocha": "^10.1.0",
+    "typescript": "^4.9.3"
+  },
+  "dependencies": {
+    "base-64": "^1.0.0",
+    "node-fetch": "2.6.6",
+    "nunjucks": "^3.2.0",
+    "vscode-uri": "^3.0.0",
+    "yaml": "^2.2.0",
+		"@vscode/codicons": "0.0.20"
+  }
+}

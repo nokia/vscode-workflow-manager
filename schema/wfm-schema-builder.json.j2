@@ -1,0 +1,462 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "definitions": {
+        "workflow": {
+            "type": "object",
+            "properties": {
+                "version": {
+                    "title": "Workflow version (WFM)",
+                    "markdownDescription": "Version of the workflow. Semantic versioning pattern must be used. *Optional*.",
+                    "type": "string",
+                    "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$",
+                    "examples": ["1.0.0"]
+                },
+                "type": {
+                    "title": "Workflow type",
+                    "markdownDescription": "Either `direct` or `reverse`. *Optional*.\\\nDefault: `direct`",
+                    "type": "string",
+                    "default": "direct",
+                    "enum": ["direct", "reverse"]
+                },
+                "description": {
+                    "title": "Workflow description",
+                    "markdownDescription": "Arbitrary text containing workflow description. *Optional*.",
+                    "type": "string"
+                },
+                "tags": {
+                    "title": "Workflow tags",
+                    "markdownDescription": "List of predefined and custom tags associated with this workflow. *Optional*.",
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array",
+                    "examples": ["LSO"]
+                },
+                "workflow_meta":{
+                    "title": "",
+                    "markdownDescription": "",
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "title": "Workflow meta title",
+                            "markdownDescription": "Workflow Title.",
+                            "type": "string"
+                        },
+                        "author": {
+                            "title": "Workflow author.",
+                            "markdownDescription": "Author of the workflow.",
+                            "type": "string",
+                            "examples": ["LSO RnD team"]
+                        },
+                        "version": {
+                            "title": "Version of the workflow.",
+                            "markdownDescription": "Version of the workflow. Semantic versioning pattern must be used. *Optional*.",
+                            "type": "string",
+                            "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$",
+                            "examples": ["1.0.0"]
+                        },
+                        "license": {
+                            "title": "Workflow license",
+                            "markdownDescription": "Workflow license. *Optional*.",
+                            "type": "string",
+                            "examples": [""]
+                        },
+                        "package": {
+                            "title": "Package identifier.",
+                            "markdownDescription": "Package identifier. Example: *LSOM NE Restore*.",
+                            "type": "string",
+                            "examples": ["LSOM NE Restore"]
+                        },
+                        "deprecated": {
+                            "title": "Is it deprecated",
+                            "markdownDescription": "Is it deprecated. *Boolean*.",
+                            "type": "boolean",
+                            "examples": [true, false]
+                        },
+                        "dependencies":{
+                            "title": "Workflow platform or nodal dependencies",
+                            "markdownDescription": "Dependencies to particular nodal releases of NSP/NFM-P releases",
+                            "type":"object",
+                            "properties": {
+                                "platform":{
+                                    "title": "Platform NSP or NFM-P releases.",
+                                    "markdownDescription": "Platform NSP or NFM-P releases.",
+                                    "type":"object",
+                                    "properties": {
+                                        "nfmpOS":{
+                                            "type":"array"
+                                        },
+                                        "nspOS":{
+                                            "type":"array"
+                                        }
+                                    },
+                                    "additionalProperties": false
+                                },
+                                "nodal":{
+                                    "title": "Nodal dependencies",
+                                    "markdownDescription": "Nodal dependencies",
+                                    "type": "array",
+                                    "examples": ["\t- type: 'Nokia 7x50'\n\t  releases: ['19.10','20.x','21.x','22.x']\n\t  mgmtmode: ['model-driven', 'mixed']"]
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "input": {
+                    "title": "Workflow input",
+                    "markdownDescription": "List defining required input parameter names and optionally their default values in a form `my_param: 123`. *Optional*.",
+                    "type": "array",
+                    "items": {
+                        "type": ["string", "object"],
+                        "patternProperties": {
+                            "^[a-zA-Z].*$": {}
+                        },
+                        "pattern": "^[a-zA-Z].*$",
+                        "additionalProperties": false
+                    }
+                },
+                "vars": {
+                    "title": "Workflow variables (WFM)",
+                    "markdownDescription": "Any data structure arbitrarily containing YAQL/Jinja2 expressions that is used as additional workflow input. *Optional*.",
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-zA-Z].*$": {}
+                    },
+                    "additionalProperties": false
+                },                
+                "output": {
+                    "title": "Workflow output",
+                    "markdownDescription": "Any data structure arbitrarily containing YAQL/Jinja2 expressions that defines workflow output. May be nested. *Optional*.",
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-zA-Z].*$": {}
+                    },
+                    "additionalProperties": false
+                },
+                "output-on-error": {
+                    "title": "Workflow error-output",
+                    "markdownDescription": "Any data structure arbitrarily containing YAQL/Jinja2 expressions that defines output of a workflow to be returned if it goes into error state. May be nested. *Optional*.",
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-zA-Z].*$": {}
+                    },
+                    "additionalProperties": false
+                },
+                "task-defaults": {
+                    "title": "Task defaults",
+                    "markdownDescription": "Enables developers to set some task attributes default at workflow level. *Optional*. Corresponding attribute defined for a specific task always takes precedence.",
+                    "type": "object"
+                },
+                "tasks": {
+                    "title": "Workflow tasks",
+                    "markdownDescription": "Task names must not be equal to `noop`, `fail`, `succeed` or `pause`.",
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-zA-Z].*$": {
+                            "$ref": "#/definitions/task"
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false,
+            "required": ["tasks"]
+        },
+        "task": {
+            "title": "Workflow task",
+            "markdownDescription": "Defines specific computational step in the workflow. Each task can optionally take input data and produce output. Tasks can be associated with an action or a workflow.",
+            "type": "object",
+            "properties": {
+                "description": {
+                    "title": "Task description",
+                    "markdownDescription": "Arbitrary text containing task description. *Optional*.",
+                    "type": "string"
+                },
+                "action": {
+                    "title": "Action",
+                    "markdownDescription": "Name of the action associated with the task. Can be a static value or an expression. *Mutually exclusive with `workflow`. If neither `action` nor `workflow` are provided, then the action `std.noop` will be used that does nothing.",
+                    "type": "string",
+                    "enum": [
+{%- for action in actions %}
+                        "{{ action.name }}"{{"," if not loop.last}} 
+{%- endfor %}
+                    ]
+                },
+                "workflow": {
+                    "title": "(Sub-)Workflow",
+                    "markdownDescription": "Name of the workflow associated with the task. Can be a static value or an expression. *Mutually exclusive with `action`. If neither `action` nor `workflow` are provided, then the action `std.noop` will be used that does nothing.",
+                    "type": "string"
+                },
+                "input": {
+                    "title": "Input",
+                    "markdownDescription": "Input parameter values of the action or sub-workflow.",
+                    "type": "object"
+
+                },
+                "publish": {
+                    "title": "Publish",
+                    "markdownDescription": "Variables to publish to the workflow context in case of task execution success. Any JSON-compatible data structure optionally containing expression to select precisely what needs to be published. Published variables will be accessible for downstream tasks using expressions. *Optional*.",
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-zA-Z].*$": {}
+                    },
+                    "additionalProperties": false
+                },
+                "publish-on-error": {
+                    "title": "Publish on Error",
+                    "markdownDescription": "Variables to publish to the workflow context in case of task execution failures. Any JSON-compatible data structure optionally containing expression to select precisely what needs to be published. Published variables will be accessible for downstream tasks using expressions. *Optional*.",
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-zA-Z].*$": {}
+                    },
+                    "additionalProperties": false
+                },
+                "with-items": {
+                    "title": "With items",
+                    "markdownDescription": "Allows to run action or workflow associated with a task multiple times iterating over a provided list of items. *Optional*.",
+                    "type": ["string", "array"],
+                    "pattern": "^.* in <%.*%>$",
+                    "items": {
+                        "type": ["string"],
+                        "pattern": "^.* in <%.*%>$"
+                    }
+                },
+                "keep-result": {
+                    "title": "Keep result",
+                    "markdownDescription": "Allows to disable the storage of action results after task completion (e.g. if they are large and not needed afterwards). *Optional*. By default is `true`.",
+                    "type": "boolean",
+                    "default": true
+                },
+                "target": {
+                    "type": "string"
+                },
+                "pause-before": {
+                    "title": "Pause before",
+                    "markdownDescription": "Put workflow engine on hold before starting the task. *Optional*.",
+                    "type": "boolean"
+                },
+                "wait-before": {
+                    "title": "Wait before",
+                    "markdownDescription": "Defines a delay in seconds that workflow engine should wait after the task has completed before starting next tasks defined in *on-success*, *on-error* or *on-complete*. *Optional*.",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "wait-after": {
+                    "title": "Wait after",
+                    "markdownDescription": "Defines a delay in seconds that workflow engine should wait before starting the task. *Optional*.",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "fail-on": {
+                    "title": "Fail on",
+                    "markdownDescription": "Defines a condition under which the task will fail, even if the action/workflow was completed successfully. *Optional*.",
+                    "type": "string",
+                    "pattern": "^<%.*%>$"
+                },
+                "timeout": {
+                    "title": "Timeout",
+                    "markdownDescription": "Defines a period of time in seconds after which the task/workflow will be failed automatically by engine if it hasn’t completed. *Optional*.",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "retry": {
+                    "title": "Retry Policy",
+                    "markdownDescription": "Defines a pattern how task should be repeated in case of an error. *Optional*.",
+                    "type": "object",
+                    "properties": {
+                        "count": {
+                            "title": "Count",
+                            "markdownDescription": "Defines a maximum number of times that a task can be repeated. *Optional*.",
+                            "type": ["integer","string"],
+                            "minimum": 1,
+                            "pattern": "^<%.*%>$"
+                        },
+                        "delay": {
+                            "title": "Delay",
+                            "markdownDescription": "Defines a delay in seconds between subsequent task iterations. *Optional*.",
+                            "type": ["integer","string"],
+                            "minimum": 1,
+                            "pattern": "^<%.*%>$"
+                        },
+                        "break-on": {
+                            "title": "Break-on",
+                            "markdownDescription": "Defines an expression that will break iteration loop if it evaluates to `true`. If it fires then the task is considered error. *Optional*.",
+                            "type": "string",
+                            "pattern": "^<%.*%>$"
+                        },
+                        "continue-on": {
+                            "title": "Continue-on",
+                            "markdownDescription": "Defines an expression that will continue iteration loop if it evaluates to `true`. If it fires then the task is considered successful. If it evaluates to `false` then policy will break the iteration. *Optional*.",
+                            "type": "string",
+                            "pattern": "^<%.*%>$"
+                        }       
+                    }
+                },
+                "safe-rerun": {
+                    "title": "Safe to rerun",
+                    "markdownDescription": "Allow to rerun task if executor dies during action execution. If set to `true` task may be run twice. *Optional*. By default set to `false`.",
+                    "type": "boolean"
+                },
+                "concurrency": {
+                    "title": "Concurrency (Flow Control)",
+                    "markdownDescription": "Defines a max number of actions or workflows running simultaneously in a task. Applicable only for tasks that have `with-items`. If property is not set then actions (or workflows in case of nested workflows) of the task will be scheduled for execution all at once. *Optional*.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "join": {
+                    "title": "Join (Flow Control)",
+                    "markdownDescription": "Allows to synchronize multiple parallel workflow branches and aggregate their data. *Optional*.",
+                    "anyOf": [
+                        {
+                            "type": "string",
+                            "enum": ["all"]
+                        },
+                        {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    ]
+                },
+                "on-success": {
+                    "title": "On-success (Flow Control)",
+                    "markdownDescription": "List of tasks which will run after the task has completed successfully. *Optional*.",
+                    "type": ["array","string"],
+                    "items": {
+                        "type": ["string", "object"],
+                        "patternProperties": {
+                            "^[a-zA-Z].*$": {
+                                "type": "string",
+                                "pattern": "^<%.*%>$"
+                            }
+                        },
+                        "pattern": "^[a-zA-Z].*$",
+                        "additionalProperties": false
+                    }
+                },
+                "on-error": {
+                    "title": "On-error (Flow Control)",
+                    "markdownDescription": "List of tasks which will run after the task has completed with an error. *Optional*.",
+                    "type": ["array","string"],
+                    "items": {
+                        "type": ["string", "object"],
+                        "patternProperties": {
+                            "^[a-zA-Z].*$": {
+                                "type": "string",
+                                "pattern": "^<%.*%>$"
+                            }
+                        },
+                        "pattern": "^[a-zA-Z].*$",
+                        "additionalProperties": false
+                    }
+                },
+                "on-complete": {
+                    "title": "On-complete (Flow Control)",
+                    "markdownDescription": "List of tasks which will run after the task has completed regardless of whether it is successful or not. *Optional*.",
+                    "type": ["array","string"],
+                    "items": {
+                        "type": ["string", "object"],
+                        "patternProperties": {
+                            "^[a-zA-Z].*$": {
+                                "type": "string",
+                                "pattern": "^<%.*%>$"
+                            }
+                        },
+                        "pattern": "^[a-zA-Z].*$",
+                        "additionalProperties": false
+                    }
+                }
+
+            },
+            "additionalProperties": false,
+            "allOf": [
+{%- for action in actions %}
+                {
+                    "if": {"properties": {"action": {"const": "{{ action.name }}"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/{{ action.name }}"}
+                        },
+                        "title": "{{ action.name }}",                
+                        "markdownDescription": "{{ action.description }}"
+                    }
+                }{{"," if not loop.last}}
+{%- endfor %}
+           ]
+        },
+        "action-input": {
+{%- for action in actions %}
+            "{{ action.name }}": {
+                "title": "{{ action.name }}",
+                "markdownDescription": "{{ action.description }}",
+                "type": "object",
+                "properties": {
+{%- for property_name, property in action.properties %}
+                    "{{ property_name }}": {
+{%- if property.description %}
+                        "markdownDescription": "{{ property.description }}",
+{%- endif %}                        
+{%- if property.type == "String" %}
+                        "type": "string",
+{%- elif property.type == "string" %}
+                        "type": "string",
+{%- elif property.type == "choice" %}
+                        "type": "string",
+{%- elif property.type == "int" %}
+                        "type": ["number", "string"],
+                        "pattern": "^<%.*%>$",
+{%- elif property.type == "Integer" %}
+                        "type": ["number", "string"],
+                        "pattern": "^<%.*%>$",
+{%- elif property.type == "dictionary" %}
+                        "type": ["object", "string"],
+                        "pattern": "^<%.*%>$",
+{%- elif property.type == "dict" %}
+                        "type": ["object", "string"],
+                        "pattern": "^<%.*%>$",
+{%- elif property.type == "choice" %}
+                        "type": ["object", "string"],
+                        "pattern": "^<%.*%>$",
+{%- elif property.type == "boolean" %}
+                        "type": ["boolean", "string"],
+                        "pattern": "^<%.*%>$",
+{%- elif property.type == "Boolean" %}
+                        "type": ["boolean", "string"],
+                        "pattern": "^<%.*%>$",
+{%- elif property.type == "List of String" %}
+                        "type": ["array", "string"],
+                        "items": {
+                            "type": "string"
+                        },
+                        "pattern": "^<%.*%>$",
+{%- endif %}
+                        "title": "{{ property_name }}"
+                    }{{"," if not loop.last}}
+{%- endfor %}
+                },
+                "additionalProperties": false
+            }{{"," if not loop.last}}
+{%- endfor %}
+        }
+    },
+    "required": [
+        "version"
+    ],
+    "properties": {
+        "version": {
+            "type": "string",
+            "markdownDescription": "Mistral DSL version number",
+            "enum": ["2.0"]
+        }
+    },
+    "patternProperties": {
+        "^(?!(version)).*$": {
+            "$ref": "#/definitions/workflow"
+        }
+    },
+    "maxProperties": 2,
+    "minProperties": 2,
+    "type": "object"
+}
