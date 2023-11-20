@@ -2,9 +2,9 @@
   "name": "nokia-wfm",
   "displayName": "NOKIA_WFM",
   "description": "NOKIA WFM vsCode Developer Plugin",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "icon": "media/Nokia_WFM.png",
-  "publisher": "NokiaAutomatION",
+  "publisher": "Nokia",
   "engines": {
     "vscode": "^1.76.0"
   },
@@ -41,6 +41,11 @@
           "type": "string",
           "default": "password",
           "description": "NSP password"
+        },
+        "workflowManager.port":{
+          "type": "string",
+          "default": "8546",
+          "description": "NSP WFM port."
         },
         "workflowManager.localStorage.enable": {
           "type": "boolean",

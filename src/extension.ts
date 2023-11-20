@@ -19,10 +19,11 @@ export function activate(context: vscode.ExtensionContext) {
 	const server : string   = config.get("server")   ?? "";
 	const username : string = config.get("username") ?? "";
 	const password : string = config.get("password") ?? "";
+	const port : string = config.get("port") ?? "";
 	const localsave : boolean = config.get("localStorage.enable") ?? false;
 	const localpath : string = config.get("localStorage.folder") ?? "";
 
-	const wfmProvider = new WorkflowManagerProvider(server, username, password, localsave, localpath);
+	const wfmProvider = new WorkflowManagerProvider(server, username, password, port, localsave, localpath);
 	context.subscriptions.push(vscode.workspace.registerFileSystemProvider('wfm', wfmProvider, { isCaseSensitive: true }));
 	context.subscriptions.push(vscode.window.registerFileDecorationProvider(wfmProvider));
 	wfmProvider.extContext=context;

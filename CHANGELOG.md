@@ -29,3 +29,9 @@ Roadmap:
 * File name ending. Shall we integrate ".yaml" when downloading?
 * Support for Jinja templates.
 * Running ad-hoc actions.
+
+## [1.0.0]
+
+Updates:
+* Port is now configurable to connect to WS NOC WFM
+* Handle disconnects from the system (timeouts)

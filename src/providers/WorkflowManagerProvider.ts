@@ -44,6 +44,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	authToken: any|undefined;
 	localsave: boolean;
 	localpath: string;
+	port: string;
 
 	extContext: vscode.ExtensionContext;
 
@@ -53,12 +54,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	public onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[] | undefined>;
     private _eventEmiter: vscode.EventEmitter<vscode.Uri | vscode.Uri[]>;
 
-	constructor (nspAddr: string, username: string, password: string, localsave: boolean, localpath: string) {
+	constructor (nspAddr: string, username: string, password: string, port: string, localsave: boolean, localpath: string) {
 		console.log("creating WorkflowManagerProvider("+nspAddr+")");
 		this.nspAddr = nspAddr;
 		this.username = username;
 		this.password = password;
 		this.authToken = undefined;
+		this.port = port;
 
 		// caching actions/workflows for better performance
 		// updated whenever calling readDirectory()
@@ -80,39 +82,56 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	// --- private methods: auth-token
 
 	private async _getAuthToken(): Promise<void> {
-		if (!this.authToken) {
-			this.authToken = new Promise((resolve, reject) => {
-				console.log("No valid auth-token; getting a new one...");
-				process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+        console.log("executing _getAuthToken()");
 
-				const fetch = require('node-fetch');
-				const base64 = require('base-64');
-			
-				const url = "https://"+this.nspAddr+"/rest-gateway/rest/api/v1/auth/token";
-				fetch(url, {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'Cache-Control': 'no-cache',
-						'Authorization': 'Basic ' + base64.encode(this.username+ ":" +this.password)
-					},
-					body: '{"grant_type": "client_credentials"}'
-				}).then(response => {
-					console.log("POST", url, response.status);
-					if (!response.ok) {
-						reject("Authentication Error!");
-						throw new Error("Authentication Error!");
-					}
-					return response.json();
-				}).then(json => {
-					console.log("new authToken:", json.access_token);
-					resolve(json.access_token);
-					// automatically revoke token after 10min
-					setTimeout(() => this._revokeAuthToken(), 600000);
-				}).catch(error => console.error(error.message));
-			});
-		}
-	}
+        if (this.authToken) {
+            if (!(await this.authToken)) {
+                this.authToken = undefined;
+            }
+        }
+
+        if (!this.authToken) {
+            this.authToken = new Promise((resolve, reject) => {
+                console.log("No valid auth-token; getting a new one...");
+                process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
+                const fetch = require('node-fetch');
+                const base64 = require('base-64');
+
+                const timeout = new AbortController();
+                setTimeout(() => timeout.abort(), 10000);
+
+                const url = "https://"+this.nspAddr+"/rest-gateway/rest/api/v1/auth/token";
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache',
+                        'Authorization': 'Basic ' + base64.encode(this.username+ ":" +this.password)
+                    },
+                    body: '{"grant_type": "client_credentials"}',
+                    signal: timeout.signal
+                }).then(response => {
+                    console.log("POST", url, response.status);
+                    if (!response.ok) {
+                        reject("Authentication Error!");
+                        throw new Error("Authentication Error!");
+                    }
+                    return response.json();
+                }).then(json => {
+                    console.log("new authToken:", json.access_token);
+                    resolve(json.access_token);
+                    // automatically revoke token after 10min
+                    setTimeout(() => this._revokeAuthToken(), 600000);
+                }).catch(error => {
+                    console.error(error.message);
+                    // reject("Connection Error!");
+					vscode.window.showWarningMessage("NSP is not reachable");
+                    resolve(undefined);
+                });
+            });
+        }
+    }
 
 	private async _revokeAuthToken(): Promise<void> {
 		if (this.authToken) {
@@ -138,19 +157,37 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 	}
 
+	private async _callNSP(url:string, options:any): Promise<void>{
+		const fetch = require('node-fetch');
+		const timeout = new AbortController();
+        setTimeout(() => timeout.abort(), 20000);
+		options['signal']=timeout.signal;
+		let response: any = new Promise((resolve, reject) => {
+		 	fetch(url, options)
+			.then(response => resolve(response))
+			.catch(error => { 
+				console.log(error.message);
+				vscode.window.showWarningMessage("NSP is not reachable");
+				resolve(undefined)});
+		});
+		return response;
+	}
+
 	// --- private methods: WFM workflows
 
 	private async _createWorkflow(data: string): Promise<void> {
-		const fetch = require('node-fetch');
 
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
 
 		// validate workflow definition
 
-		let url = 'https://'+this.nspAddr+':8546/wfm/api/v1/workflow/validate';
-		let response: any = await fetch(url, {
+		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/validate';
+		let response: any = await this._callNSP(url, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'text/plain',
@@ -159,6 +196,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			},
 			body: data
 		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("POST", url, response.status);
 		if (!response.ok) {
@@ -174,8 +214,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 		// upload new workflow
 
-		url = 'https://'+this.nspAddr+':8546/wfm/api/v1/workflow/definition?provider=';
-		response = await fetch(url, {
+		url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/definition?provider=';
+		response = await this._callNSP(url, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'text/plain',
@@ -184,6 +224,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			},
 			body: data
 		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("POST", url, response.status);
 		if (!response.ok) {
@@ -204,8 +247,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 		// change to PUBLISHED
 
-		url = 'https://'+this.nspAddr+':8546/wfm/api/v1/workflow/'+id+'/status';
-		response = await fetch(url, {
+		url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/status';
+		response = await this._callNSP(url, {
 			method: 'PUT',
 			headers: {
 				'Content-Type': 'application/json',
@@ -214,6 +257,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			},
 			body: '{"status": "PUBLISHED"}'
 		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("PUT", url, response.status);
 		if (!response.ok) {
@@ -225,7 +271,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	private async _updateWorkflow(name: string, data: string, rename: boolean): Promise<void> {
-		const fetch = require('node-fetch');
 		const yaml = require('yaml');
 		const id = this.workflows[name].id;
 
@@ -246,10 +291,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			// get auth-token
 			await this._getAuthToken();
 			const token = await this.authToken;
+			if (!token) {
+				throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+			}
 
 			// validate workflow definition
-			let url = 'https://'+this.nspAddr+':8546/wfm/api/v1/workflow/validate';
-			let response: any = await fetch(url, {
+			let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/validate';
+			let response: any = await this._callNSP(url, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'text/plain',
@@ -258,6 +306,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				},
 				body: data
 			});
+			if (!response){
+				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+			}
 
 			console.log("POST", url, response.status);
 			if (!response.ok) {
@@ -272,8 +323,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			vscode.window.showInformationMessage('Success: Workflow validated');
 
 			// change to DRAFT
-			url = 'https://'+this.nspAddr+':8546/wfm/api/v1/workflow/'+id+'/status';
-			response = await fetch(url, {
+			url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/status';
+			response = await this._callNSP(url, {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json',
@@ -282,6 +333,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				},
 				body: '{"status": "DRAFT"}'
 			});
+			if (!response){
+				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+			}
 
 			console.log("PUT", url, response.status);
 			if (!response.ok) {
@@ -290,8 +344,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			vscode.window.showInformationMessage('Success: Enabled DRAFT mode');
 
 			// upload workflow
-			url = 'https://'+this.nspAddr+':8546/wfm/api/v1/workflow/'+id+'/definition';
-			response = await fetch(url, {
+			url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/definition';
+			response = await this._callNSP(url, {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'text/plain',
@@ -300,6 +354,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				},
 				body: data
 			});
+			if (!response){
+				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+			}
 
 			console.log("PUT", url, response.status);
 			if (!response.ok) {
@@ -325,8 +382,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 
 			// change to PUBLISHED
-			url = 'https://'+this.nspAddr+':8546/wfm/api/v1/workflow/'+id+'/status';
-			response = await fetch(url, {
+			url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/status';
+			response = await this._callNSP(url, {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json',
@@ -335,6 +392,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				},
 				body: '{"status": "PUBLISHED"}'
 			});
+			if (!response){
+				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+			}
 
 			console.log("PUT", url, response.status);
 			if (!response.ok) {
@@ -359,18 +419,20 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	private async _deleteWorkflow(name: string): Promise<void> {
-		const fetch = require('node-fetch');
 
 		const id : string = this.workflows[name].id;
 
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
 
 		// change to DRAFT
 
-		let url = 'https://'+this.nspAddr+':8546/wfm/api/v1/workflow/'+id+'/status';
-		let response: any = await fetch(url, {
+		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/status';
+		let response: any = await this._callNSP(url, {
 			method: 'PUT',
 			headers: {
 				'Content-Type': 'application/json',
@@ -379,6 +441,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			},
 			body: '{"status": "DRAFT"}'
 		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("PUT", url, response.status);
 		if (!response.ok) {
@@ -388,14 +453,17 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 		// delete workflow
 
-		url = 'https://'+this.nspAddr+':8546/wfm/api/v1/workflow/'+id;
-		response = await fetch(url, {
+		url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id;
+		response = await this._callNSP(url, {
 			method: 'DELETE',
 			headers: {
 				'Cache-Control': 'no-cache',
 				'Authorization': 'Bearer ' + token
 			}
 		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("DELETE", url, response.status);
 		if (!response.ok) {
@@ -408,16 +476,18 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	private async _validateWorkflow(data: string): Promise<void> {
-		const fetch = require('node-fetch');
 
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
 
 		// validate workflow definition
 
-		let url = 'https://'+this.nspAddr+':8546/wfm/api/v1/workflow/validate';
-		let response: any = await fetch(url, {
+		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/validate';
+		let response: any = await this._callNSP(url, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'text/plain',
@@ -426,6 +496,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			},
 			body: data
 		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("POST", url, response.status);
 		if (!response.ok) {
@@ -452,23 +525,28 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 	
 	private async _renameWorkflow(oldName: string, newName: string): Promise<void> {
-		const fetch = require('node-fetch');
 		const yaml = require('yaml');
 
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
 
 		// get workflow definitions
 
-		let url = "https://"+this.nspAddr+":8546/wfm/api/v1/workflow/"+oldName+"/definition";
-		let response: any = await fetch(url, {
+		let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow/"+oldName+"/definition";
+		let response: any = await this._callNSP(url, {
 			method: 'GET',
 			headers: {
 				'Cache-Control': 'no-cache',
 				'Authorization': 'Bearer ' + token
 			}
 		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("GET", url, response.status);
 		if (!response.ok) {
@@ -489,15 +567,17 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	// --- private methods: WFM actions
 
 	private async _createAction(data: string): Promise<void> {
-		const fetch = require('node-fetch');
 
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
 
 		// validate action definition
-		let url = 'https://'+this.nspAddr+':8546/wfm/api/v1/action/validate';
-		let response: any = await fetch(url, {
+		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/validate';
+		let response: any = await this._callNSP(url, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'text/plain',
@@ -506,6 +586,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			},
 			body: data
 		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("POST", url, response.status);
 		if (!response.ok) {
@@ -520,8 +603,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		vscode.window.showInformationMessage('Success: Action validated');
 
 		// upload new action
-		url = 'https://'+this.nspAddr+':8546/wfm/api/v1/action/definition?provider=';
-		response = await fetch(url, {
+		url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/definition?provider=';
+		response = await this._callNSP(url, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'text/plain',
@@ -530,6 +613,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			},
 			body: data
 		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("POST", url, response.status);
 		if (!response.ok) {
@@ -550,16 +636,18 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	private async _updateAction(name: string, data: string): Promise<void> {
-		const fetch = require('node-fetch');
 		const id = this.actions[name].id;
 
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
 
 		// validate action definition
-		let url = 'https://'+this.nspAddr+':8546/wfm/api/v1/action/validate';
-		let response: any = await fetch(url, {
+		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/validate';
+		let response: any = await this._callNSP(url, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'text/plain',
@@ -568,6 +656,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			},
 			body: data
 		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("POST", url, response.status);
 		if (!response.ok) {
@@ -583,8 +674,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 		// upload action
 
-		url = 'https://'+this.nspAddr+':8546/wfm/api/v1/action/'+id+'/definition';
-		response = await fetch(url, {
+		url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/'+id+'/definition';
+		response = await this._callNSP(url, {
 			method: 'PUT',
 			headers: {
 				'Content-Type': 'text/plain',
@@ -593,6 +684,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			},
 			body: data
 		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("PUT", url, response.status);
 		if (!response.ok) {
@@ -621,24 +715,29 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	private async _deleteAction(name: string): Promise<void> {
-		const fetch = require('node-fetch');
 
 		const id : string = this.actions[name].id;
 
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
 
 		// delete action
 
-		let url = 'https://'+this.nspAddr+':8546/wfm/api/v1/action/'+id;
-		let response: any = await fetch(url, {
+		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/'+id;
+		let response: any = await this._callNSP(url, {
 			method: 'DELETE',
 			headers: {
 				'Cache-Control': 'no-cache',
 				'Authorization': 'Bearer ' + token
 			}
 		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("DELETE", url, response.status);
 		if (!response.ok) {
@@ -651,16 +750,18 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	private async _validateAction(data: string): Promise<void> {
-		const fetch = require('node-fetch');
 
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
 
 		// validate action definition
 
-		let url = 'https://'+this.nspAddr+':8546/wfm/api/v1/action/validate';
-		let response: any = await fetch(url, {
+		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/validate';
+		let response: any = await this._callNSP(url, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'text/plain',
@@ -669,6 +770,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			},
 			body: data
 		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("POST", url, response.status);
 		if (!response.ok) {
@@ -695,23 +799,28 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	private async _renameAction(oldName: string, newName: string): Promise<void> {
-		const fetch = require('node-fetch');
 		const yaml = require('yaml');
 
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
 
 		// get action definitions
 
-		let url = "https://"+this.nspAddr+":8546/wfm/api/v1/action/"+oldName+"/definition";
-		let response: any = await fetch(url, {
+		let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/action/"+oldName+"/definition";
+		let response: any = await this._callNSP(url, {
 			method: 'GET',
 			headers: {
 				'Cache-Control': 'no-cache',
 				'Authorization': 'Bearer ' + token
 			}
 		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("GET", url, response.status);
 		if (!response.ok) {
@@ -744,15 +853,17 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		html=html+`<h2>Workflow `+wfnm+`</h2><h2>Execution `+execid+`</h2><h3>Status: `+execstat+` at `+exectime+`</h3>`;
 		if (execstat==="ERROR") html=html+`<h3>`+state_info+`</h3>`;
 		
-		const fetch = require('node-fetch');
 
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
 		
-		let url = "https://"+this.nspAddr+":8546/wfm/api/v1/task/execution/"+execid;
+		let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/task/execution/"+execid;
 		console.log(url);
-		let resp = await fetch(url, {
+		let resp: any = await this._callNSP(url, {
 			method: 'GET',
 			headers: {
 				'Authorization': 'Bearer ' + token,
@@ -760,6 +871,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				'Content-Type': 'application/json'
 			}
 		});
+		if (!resp){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 		let data = await resp.json();
 		console.log(data);
 		let i=0;
@@ -818,11 +932,11 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 			if (uri?.startsWith('wfm:/workflows/')) {
 				const key = uri.toString().substring(15);
-				const url = "https://"+this.nspAddr+":8546/workflow-manager/workflows/"+key;
+				const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+key;
 				vscode.env.openExternal(vscode.Uri.parse(url));
 			} else if (uri?.startsWith('wfm:/actions/')) {
 				const key = uri.toString().substring(13);
-				const url = "https://"+this.nspAddr+":8546/workflow-manager/actions/"+key;
+				const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/actions/"+key;
 				vscode.env.openExternal(vscode.Uri.parse(url));
 			} else {
 				let doc = YAML.parse(editor.document.getText());
@@ -832,7 +946,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 						await this.readDirectory(vscode.Uri.parse('wfm:/actions'));
 					}
 					if (key in this.actions) {
-						const url = "https://"+this.nspAddr+":8546/workflow-manager/actions/"+key;
+						const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/actions/"+key;
 						vscode.env.openExternal(vscode.Uri.parse(url));
 					} else {
 						vscode.window.showErrorMessage('Need to upload action '+key+' to WFM first!');
@@ -843,7 +957,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 						await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
 					}		
 					if (key in this.workflows) {
-						const url = "https://"+this.nspAddr+":8546/workflow-manager/workflows/"+key;
+						const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+key;
 						vscode.env.openExternal(vscode.Uri.parse(url));
 					} else {
 						vscode.window.showErrorMessage('Need to upload workflow '+key+' to WFM first!');
@@ -923,6 +1037,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			// get auth-token
 			await this._getAuthToken();
 			const token = await this.authToken;
+			if (!token) {
+				throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+			}
 
 			const requestHeaders = new fetch.Headers({
 				"Content-Type": "application/json",
@@ -930,8 +1047,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				'Authorization': 'Bearer ' + token
 			});
 
-			let url = "https://"+this.nspAddr+":8546/wfm/api/v1/execution";
-			const wfm_response = await fetch(url,{method: 'POST',
+			let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/execution";
+			const wfm_response: any = await this._callNSP(url,{method: 'POST',
 				headers: requestHeaders,
 				body: JSON.stringify(
 					{
@@ -942,6 +1059,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 						}
 				)
 			});
+			if (!wfm_response){
+				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+			}
 
 				data = await wfm_response.json();
 				console.log(data);
@@ -950,15 +1070,15 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			
 			vscode.window.showInformationMessage('Workflow '+wfnm+' execution sent',"See in WFM","Cancel").then((selectedItem) => {
 				if ('See in WFM' === selectedItem) {
-					vscode.env.openExternal(vscode.Uri.parse("https://"+this.nspAddr+":8546/workflow-manager/workflows/"+wfnm+"/executions/"+execid));
+					vscode.env.openExternal(vscode.Uri.parse("https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+wfnm+"/executions/"+execid));
 				}
 				});
 		}
 	}
 
 	async lastResult(): Promise<void>{
-		const fetch = require('node-fetch');
 		const YAML = require('yaml');
+		const fetch = require('node-fetch');
 
 		const editor = vscode.window.activeTextEditor;
 		if (editor) {
@@ -967,6 +1087,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			// get auth-token
 			await this._getAuthToken();
 			const token = await this.authToken;
+			if (!token) {
+				throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+			}
 
 			let ym = YAML.parse(editor.document.getText());
 			let wfnm = Object.keys(ym).filter((value) => value !== "version")[0];
@@ -979,9 +1102,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				'Authorization': 'Bearer ' + token
 			});
 
-			const wfm_response = await fetch("https://"+this.nspAddr+":8546/wfm/api/v1/execution/workflow/"+wfnm+"?fields=id,updated_at,state",{method: 'GET',
+			const wfm_response: any = await this._callNSP("https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/execution/workflow/"+wfnm+"?fields=id,updated_at,state",{method: 'GET',
 				headers: requestHeaders,
-				});
+			});
+			
+			if (!wfm_response){
+				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+			}
 
 			data = await wfm_response.json();
 
@@ -1005,7 +1132,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					);
 					panel.webview.html = await this._getWebviewContent(wfnm,exectime,execstat,execid,state_info,panel);
 				} else if ('See in WFM' === selectedItem){
-					vscode.env.openExternal(vscode.Uri.parse("https://"+this.nspAddr+":8546/workflow-manager/workflows/"+wfnm+"/executions/"+aux.id));
+					vscode.env.openExternal(vscode.Uri.parse("https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+wfnm+"/executions/"+aux.id));
 				}
 			});
 			
@@ -1031,11 +1158,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	async generateSchema(): Promise<void> {
 		let data;
-		const fetch = require('node-fetch');	
 		
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
 	
 		process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 		let config = vscode.workspace.getConfiguration('workflowManager');
@@ -1044,14 +1173,18 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		let outpath = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema.json').toString().replace("file://","");
 		let snippetsfile = vscode.Uri.joinPath(extURI, 'schema', 'snippets.json').toString().replace("file://","");
 		let snippets:JSON={} as JSON;
-		let url = "https://"+this.nspAddr+":8546/wfm/api/v1/action";
-		const wfm_response = await fetch(url,{method: 'GET',
+		let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/action";
+		const wfm_response: any = await this._callNSP(url,{method: 'GET',
 			headers: {
 				"Content-Type": "text/plain",
 				"Cache-Control": "no-cache",
 				'Authorization': 'Bearer ' + token
 			},
 		});
+
+		if (!wfm_response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		data = await wfm_response.json();
 		//console.log(data);
@@ -1165,15 +1298,14 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	
 	async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
 		console.log("executing readDirectory("+uri+")");
-		const fetch = require('node-fetch');
 
 		let url = undefined;
 		if (uri.toString() === "wfm:/") {
 			return [['actions', vscode.FileType.Directory],['workflows', vscode.FileType.Directory]];
 		} else if (uri.toString() === "wfm:/workflows") {
-			url = "https://"+this.nspAddr+":8546/wfm/api/v1/workflow?fields=id,name,created_at,updated_at";
+			url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow?fields=id,name,created_at,updated_at";
 		} else if (uri.toString() === "wfm:/actions") {
-			url = "https://"+this.nspAddr+":8546/wfm/api/v1/action?fields=id,name,created_at,updated_at&is_system=false"; 
+			url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/action?fields=id,name,created_at,updated_at&is_system=false"; 
 		} else {
 			throw vscode.FileSystemError.FileNotADirectory('Unknown resouce!');
 		}
@@ -1181,10 +1313,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
 	
 		// get list of all workflow / action definitions
 
-		let response: any = await fetch(url, {
+		let response: any = await this._callNSP(url, {
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json',
@@ -1192,6 +1327,10 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				'Authorization': 'Bearer ' + token
 			}
 		});
+
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("GET", url, response.status);
 		if (!response.ok) {
@@ -1248,15 +1387,14 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	async readFile(uri: vscode.Uri): Promise<Uint8Array> {
 		console.log("executing readFile("+uri+")");
-		const fetch = require('node-fetch');
 
 		let url = undefined;
 		if (uri.toString().startsWith("wfm:/workflows/")) {
 			let id = uri.toString().substring(15);
-			url = "https://"+this.nspAddr+":8546/wfm/api/v1/workflow/"+id+"/definition";
+			url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow/"+id+"/definition";
 		} else if (uri.toString().startsWith("wfm:/actions/")) {
 			let id = uri.toString().substring(13);
-			url = "https://"+this.nspAddr+":8546/wfm/api/v1/action/"+id+"/definition";
+			url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/action/"+id+"/definition";
 		} else {
 			throw vscode.FileSystemError.FileNotADirectory('Unknown resouces!');
 		}
@@ -1264,16 +1402,23 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
 
 		// get workflow / action definition
 
-		let response: any = await fetch(url, {
+		let response: any = await this._callNSP(url, {
 			method: 'GET',
 			headers: {
 				'Cache-Control': 'no-cache',
 				'Authorization': 'Bearer ' + token
 			}
 		});
+
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
 		console.log("GET", url, response.status);
 		if (!response.ok) {
