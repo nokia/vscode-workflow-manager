@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+import { time } from 'console';
 import * as vscode from 'vscode';
 
 export class FileStat implements vscode.FileStat {
@@ -45,6 +46,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	localsave: boolean;
 	localpath: string;
 	port: string;
+	timeout: number;
 
 	extContext: vscode.ExtensionContext;
 
@@ -54,13 +56,14 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	public onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[] | undefined>;
     private _eventEmiter: vscode.EventEmitter<vscode.Uri | vscode.Uri[]>;
 
-	constructor (nspAddr: string, username: string, password: string, port: string, localsave: boolean, localpath: string) {
+	constructor (nspAddr: string, username: string, password: string, port: string, localsave: boolean, localpath: string, timeout: number) {
 		console.log("creating WorkflowManagerProvider("+nspAddr+")");
 		this.nspAddr = nspAddr;
 		this.username = username;
 		this.password = password;
 		this.authToken = undefined;
 		this.port = port;
+		this.timeout = timeout;
 
 		// caching actions/workflows for better performance
 		// updated whenever calling readDirectory()
@@ -99,7 +102,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
                 const base64 = require('base-64');
 
                 const timeout = new AbortController();
-                setTimeout(() => timeout.abort(), 10000);
+                setTimeout(() => timeout.abort(), this.timeout);
 
                 const url = "https://"+this.nspAddr+"/rest-gateway/rest/api/v1/auth/token";
                 fetch(url, {
@@ -160,7 +163,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	private async _callNSP(url:string, options:any): Promise<void>{
 		const fetch = require('node-fetch');
 		const timeout = new AbortController();
-        setTimeout(() => timeout.abort(), 20000);
+        setTimeout(() => timeout.abort(), this.timeout);
 		options['signal']=timeout.signal;
 		let response: any = new Promise((resolve, reject) => {
 		 	fetch(url, options)

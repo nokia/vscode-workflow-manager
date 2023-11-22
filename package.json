@@ -2,7 +2,7 @@
   "name": "nokia-wfm",
   "displayName": "NOKIA_WFM",
   "description": "NOKIA WFM vsCode Developer Plugin",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "icon": "media/Nokia_WFM.png",
   "publisher": "Nokia",
   "engines": {
@@ -56,6 +56,11 @@
           "type": "string",
           "default": "/tmp/",
           "description": "Local storage folder"
+        },
+        "workflowManager.timeout": {
+          "type": "number",
+          "default": 20000,
+          "description": "Connection timeout in ms"
         }
       }
     },

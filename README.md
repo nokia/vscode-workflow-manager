@@ -1,4 +1,4 @@
-# nokia-nsp-wfm 
+# NOKIA Workflow Manager vsCode extension 
 
 This vsCode extension connects to Nokia NSP WFM to facilitate workflow development and delivery.
 

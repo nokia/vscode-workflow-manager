@@ -35,3 +35,8 @@ Roadmap:
 Updates:
 * Port is now configurable to connect to WS NOC WFM
 * Handle disconnects from the system (timeouts)
+
+## [1.0.1]
+
+Updates:
+* Allow users to configure connection timeouts (default 20 secs)
