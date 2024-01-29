@@ -2,7 +2,7 @@
   "name": "nokia-wfm",
   "displayName": "NOKIA_WFM",
   "description": "NOKIA WFM vsCode Developer Plugin",
-  "version": "1.0.1",
+  "version": "1.1.1",
   "icon": "media/Nokia_WFM.png",
   "publisher": "Nokia",
   "engines": {
@@ -61,6 +61,13 @@
           "type": "number",
           "default": 20000,
           "description": "Connection timeout in ms"
+        },
+        "workflowManager.ignoreTags": {
+          "type": "array",
+            "items": {
+                "type": "string"
+          },
+          "description": "Workflows with these tags will be hidden."
         }
       }
     },
@@ -79,6 +86,11 @@
         {
           "when": "resourceLangId == yaml",
           "command": "nokia-wfm.openInBrowser",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceLangId == yaml && activeEditorIsDirty == true",
+          "command": "workbench.files.action.compareWithSaved",
           "group": "navigation"
         },
         {
@@ -110,6 +122,12 @@
         "category": "WFM",
         "title": "Apply Schema for Validation",
         "icon": "$(clear-all)"
+      },
+      {
+        "command": "workbench.files.action.compareWithSaved",
+        "category": "WFM",
+        "title": "Compare changes",
+        "icon": "$(request-changes)"
       },
       {
         "command": "nokia-wfm.lastResult",

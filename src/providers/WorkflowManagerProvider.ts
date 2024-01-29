@@ -47,6 +47,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	localpath: string;
 	port: string;
 	timeout: number;
+	fileIgnore: Array<string>;
 
 	extContext: vscode.ExtensionContext;
 
@@ -56,7 +57,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	public onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[] | undefined>;
     private _eventEmiter: vscode.EventEmitter<vscode.Uri | vscode.Uri[]>;
 
-	constructor (nspAddr: string, username: string, password: string, port: string, localsave: boolean, localpath: string, timeout: number) {
+	constructor (nspAddr: string, username: string, password: string, port: string, localsave: boolean, localpath: string, timeout: number, fileIgnore: Array<string>) {
 		console.log("creating WorkflowManagerProvider("+nspAddr+")");
 		this.nspAddr = nspAddr;
 		this.username = username;
@@ -64,6 +65,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.authToken = undefined;
 		this.port = port;
 		this.timeout = timeout;
+		this.fileIgnore = fileIgnore;
 
 		// caching actions/workflows for better performance
 		// updated whenever calling readDirectory()
@@ -1306,7 +1308,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (uri.toString() === "wfm:/") {
 			return [['actions', vscode.FileType.Directory],['workflows', vscode.FileType.Directory]];
 		} else if (uri.toString() === "wfm:/workflows") {
-			url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow?fields=id,name,created_at,updated_at";
+			url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow?fields=id,name,created_at,updated_at,tags";
 		} else if (uri.toString() === "wfm:/actions") {
 			url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/action?fields=id,name,created_at,updated_at&is_system=false"; 
 		} else {
@@ -1351,7 +1353,21 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			);
 		}
 
-		let result: [string, vscode.FileType][] = (json?.response.data ?? []).map<[string, vscode.FileType]> (entry => [entry.name, vscode.FileType.File]);
+		
+		let filteredList = json?.response.data;
+		if (uri.toString() === "wfm:/workflows") {
+			function checkLabels(obj,ignoreLabels){
+				console.log(ignoreLabels);
+				var filteredArray = ignoreLabels.tags.filter(value => obj.includes(value));;
+				if (filteredArray.length==0){
+					//console.log("Returning "+ignoreLabels.name);
+					return ignoreLabels;
+				}
+			}
+			filteredList = json?.response.data.filter(checkLabels.bind(this,this.fileIgnore));
+		}
+
+		let result: [string, vscode.FileType][] = (filteredList ?? []).map<[string, vscode.FileType]> (entry => [entry.name, vscode.FileType.File]);
 		return result;
 	}
 

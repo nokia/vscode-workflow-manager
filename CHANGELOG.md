@@ -40,3 +40,9 @@ Updates:
 
 Updates:
 * Allow users to configure connection timeouts (default 20 secs)
+
+## [1.1.1]
+
+Updates:
+* For unsaved files, we add the compare functionality so the user can see all modifications before saving.
+* In settings, the user can define a list of tags to be ignored by the plugin, to reduce the amount of workflows shown in the workflow list. When modified, the user will have to reload the vsCode window.
