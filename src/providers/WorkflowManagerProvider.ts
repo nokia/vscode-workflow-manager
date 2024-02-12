@@ -48,6 +48,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	port: string;
 	timeout: number;
 	fileIgnore: Array<string>;
+	secretStorage: vscode.SecretStorage;
 
 	extContext: vscode.ExtensionContext;
 
@@ -57,15 +58,16 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	public onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[] | undefined>;
     private _eventEmiter: vscode.EventEmitter<vscode.Uri | vscode.Uri[]>;
 
-	constructor (nspAddr: string, username: string, password: string, port: string, localsave: boolean, localpath: string, timeout: number, fileIgnore: Array<string>) {
+	constructor (nspAddr: string, username: string, secretStorage: vscode.SecretStorage, port: string, localsave: boolean, localpath: string, timeout: number, fileIgnore: Array<string>) {
 		console.log("creating WorkflowManagerProvider("+nspAddr+")");
 		this.nspAddr = nspAddr;
 		this.username = username;
-		this.password = password;
+		this.password = "";
 		this.authToken = undefined;
 		this.port = port;
 		this.timeout = timeout;
 		this.fileIgnore = fileIgnore;
+		this.secretStorage = secretStorage;
 
 		// caching actions/workflows for better performance
 		// updated whenever calling readDirectory()
@@ -94,9 +96,11 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
                 this.authToken = undefined;
             }
         }
+		this.password = await this.secretStorage.get("nsp_wfm_password");
 
         if (!this.authToken) {
             this.authToken = new Promise((resolve, reject) => {
+				
                 console.log("No valid auth-token; getting a new one...");
                 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -119,6 +123,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
                 }).then(response => {
                     console.log("POST", url, response.status);
                     if (!response.ok) {
+						vscode.window.showErrorMessage("WFM: NSP Auth Error");
                         reject("Authentication Error!");
                         throw new Error("Authentication Error!");
                     }

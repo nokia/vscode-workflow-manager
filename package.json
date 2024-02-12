@@ -2,7 +2,7 @@
   "name": "nokia-wfm",
   "displayName": "NOKIA_WFM",
   "description": "NOKIA WFM vsCode Developer Plugin",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "icon": "media/Nokia_WFM.png",
   "publisher": "Nokia",
   "engines": {
@@ -29,41 +29,49 @@
         "workflowManager.server": {
           "type": "string",
           "default": "127.0.0.1",
+          "scope": "application",
           "format": "ipv4",
           "description": "NSP server address"
         },
         "workflowManager.username": {
           "type": "string",
           "default": "username",
+          "scope": "application",
           "description": "NSP username"
         },
         "workflowManager.password": {
-          "type": "string",
-          "default": "password",
-          "description": "NSP password"
+          "description": "NSP password",
+          "type": "null",
+          "scope": "application",
+          "markdownDescription": "[Set Password](command:nokia-wfm.setPassword)"
         },
         "workflowManager.port":{
           "type": "string",
           "default": "8546",
+          "scope": "application",
           "description": "NSP WFM port."
         },
         "workflowManager.localStorage.enable": {
           "type": "boolean",
           "default": false,
+          "scope": "application",
           "description": "Allow local storage"
         },
         "workflowManager.localStorage.folder": {
           "type": "string",
           "default": "/tmp/",
+          "scope": "application",
           "description": "Local storage folder"
         },
         "workflowManager.timeout": {
           "type": "number",
           "default": 20000,
+          "scope": "application",
           "description": "Connection timeout in ms"
         },
         "workflowManager.ignoreTags": {
           "type": "array",
+          "scope": "application",
             "items": {
                 "type": "string"
           },

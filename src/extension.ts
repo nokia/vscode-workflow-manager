@@ -15,10 +15,10 @@ import { WorkflowManagerProvider, CodelensProvider } from './providers';
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Workflow Manager says "Hello"');
 
+	const secretStorage: vscode.SecretStorage = context.secrets;
 	const config = vscode.workspace.getConfiguration('workflowManager');
 	const server : string   = config.get("server")   ?? "";
 	const username : string = config.get("username") ?? "";
-	const password : string = config.get("password") ?? "";
 	const port : string = config.get("port") ?? "";
 	const timeout : number = config.get("timeout") ?? 20000;
 	const localsave : boolean = config.get("localStorage.enable") ?? false;
@@ -28,7 +28,7 @@ export function activate(context: vscode.ExtensionContext) {
 	console.log("Ignore labels:");
 	console.log(fileIgnore);
 
-	const wfmProvider = new WorkflowManagerProvider(server, username, password, port, localsave, localpath, timeout, fileIgnore);
+	const wfmProvider = new WorkflowManagerProvider(server, username, secretStorage, port, localsave, localpath, timeout, fileIgnore);
 	context.subscriptions.push(vscode.workspace.registerFileSystemProvider('wfm', wfmProvider, { isCaseSensitive: true }));
 	context.subscriptions.push(vscode.window.registerFileDecorationProvider(wfmProvider));
 	wfmProvider.extContext=context;
@@ -99,6 +99,17 @@ export function activate(context: vscode.ExtensionContext) {
 			vscode.commands.executeCommand('git.clone', 'https://github.com/nokia/nsp-workflow.git', gitPath);
 		}
 	}));
+
+	vscode.commands.registerCommand('nokia-wfm.setPassword', async () => {
+		const passwordInput: string = await vscode.window.showInputBox({
+		  password: true, 
+		  title: "Password"
+		}) ?? '';
+		
+		if(passwordInput !== ''){
+			secretStorage.store("nsp_wfm_password", passwordInput);
+		};
+	  });
 
 	vscode.workspace.onDidChangeWorkspaceFolders(async () => {
 		const workspaceFolders =  vscode.workspace.workspaceFolders ?  vscode.workspace.workspaceFolders : [];
