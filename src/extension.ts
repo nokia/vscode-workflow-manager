@@ -12,7 +12,7 @@ import * as fs from 'fs';
 
 import { WorkflowManagerProvider, CodelensProvider } from './providers';
 
-export function activate(context: vscode.ExtensionContext) {
+export function activate(context: vscode.ExtensionContext) { // 
 	console.log('Workflow Manager says "Hello"');
 
 	const secretStorage: vscode.SecretStorage = context.secrets;
