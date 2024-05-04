@@ -4,15 +4,17 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-'use strict';
+'use strict'; 
 
-import * as vscode from 'vscode';
-import * as os from 'os';
-import * as fs from 'fs';
+import * as vscode from 'vscode'; // import the vscode module (VS Code API)
+import * as os from 'os'; //  import operating system
+import * as fs from 'fs'; // import filesystem
 
-import { WorkflowManagerProvider, CodelensProvider } from './providers';
+// WorkflowManagerProvider is a class that contains all workflow operations.
+import { WorkflowManagerProvider, CodelensProvider } from './providers'; 
 
-export function activate(context: vscode.ExtensionContext) { // 
+// This function is ran once the the extension is activated:
+export function activate(context: vscode.ExtensionContext) {  
 	console.log('Workflow Manager says "Hello"');
 
 	const secretStorage: vscode.SecretStorage = context.secrets;
