@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-'use strict'; 
+'use strict'; // 
 
 import * as vscode from 'vscode'; // import the vscode module (VS Code API)
 import * as os from 'os'; //  import operating system
