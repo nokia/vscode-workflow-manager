@@ -287,7 +287,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 		let defname = Object.keys(yaml.parse(data)).filter((value) => value !== "version")[0];
 
-		if ((defname !== name) && (!rename)) {v // if the name in the definition is different from the filename and not a rename
+		if ((defname !== name) && (!rename)) { // if the name in the definition is different from the filename and not a rename
 			if (Object.keys(this.workflows).indexOf(defname)=== -1) {
 				vscode.window.showInformationMessage('Workflow Name changed, creating new workflow.');
 				await this._createWorkflow(data);
@@ -1416,19 +1416,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	async readFile(uri: vscode.Uri): Promise<Uint8Array> {
-		// strip the extension so .action or .yaml at the end
-		console.log("uri: ", uri)
-		uri = uri.with({path: uri.path.replace(/\.action$/, '').replace(/\.yaml$/, '')}); // parse out the file extension from the uri.
-		console.log("executing readFile("+uri+")");
-		console.log("new uri: ", uri)
-
 		let url = undefined;
 		if (uri.toString().startsWith("wfm:/workflows/")) {
-			let id = uri.toString().substring(15);
+			let id = uri.toString().substring(15).replace('.yaml', '');
 			console.log("id: ", id)
 			url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow/"+id+"/definition";
 		} else if (uri.toString().startsWith("wfm:/actions/")) {
-			let id = uri.toString().substring(13);
+			let id = uri.toString().substring(13).replace('.action', '');
 			url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/action/"+id+"/definition";
 		} else {
 			throw vscode.FileSystemError.FileNotADirectory('Unknown resouces!');
@@ -1441,9 +1435,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
             throw vscode.FileSystemError.Unavailable('NSP is not reachable');
         }
 
-		// get workflow / action definition
-
-		let response: any = await this._callNSP(url, {
+		let response: any = await this._callNSP(url, { // get workflow / action definition
 			method: 'GET',
 			headers: {
 				'Cache-Control': 'no-cache',
@@ -1467,9 +1459,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	async writeFile(uri: vscode.Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): Promise<void> {
-		console.log("uri: ", uri)
-		uri = uri.with({path: uri.path.replace(/\.action$/, '').replace(/\.yaml$/, '')}); // parse out the file extension from the uri.
-		console.log("executing writeFile("+uri+")");
 		if (uri.toString().startsWith('wfm:/workflows/')) {
 			const key = uri.toString().substring(15);
 			await this._writeWorkflow(key, content.toString());
