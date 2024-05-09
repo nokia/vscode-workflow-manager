@@ -8,9 +8,13 @@
 		],
 		"sourceMap": true,
 		"rootDir": "src",
-		"strict": true,
-		"noImplicitAny": false // added so error/warning: Parameter 'xxx' implicitly has an 'any' type is removed.
-
+		"strict": false, // Disable all strict type-checking compiler options
+		"noImplicitAny": false, // added so error/warning: Parameter 'xxx' implicitly has an 'any' type is removed.
+		// "strictNullChecks": false,
+		// "strictFunctionTypes": false,
+		// "exactOptionalPropertyTypes": false,
+		// "suppressImplicitAnyIndexErrors": false
+		// "suppressImplicitAnyIndexErrors": false
 		/* enable all strict type-checking options */
 		/* Additional Checks */
 		// "noImplicitReturns": true, /* Report error when not all code paths in function return a value. */

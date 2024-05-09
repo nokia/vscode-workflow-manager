@@ -25,7 +25,6 @@ The vsCode extension for NSP WFM allows a user to:
 * Access WFM with the right pointers to workflows and executions.
 * Do all abovementioned actions on a local repository (local folder, git).
 
-
 ## Requirements
 
 This package uses YAML, FETCH, vscode-URI and base-64 packages. For FETCH, it is importan to install 2.6.6 version. See other requirements in package.json.
@@ -37,6 +36,22 @@ To compile and generate the VSIX for installation, run:
     npm install .
     npm run compile
     vsce package
+
+
+## VsCode Extension Development
+
+1. To compile the typescript extension run:
+
+```bash
+npm run compile
+```
+
+2. To run and open the live instance of the extension, open the VsCode Debugger.
+    - ctrl+shift+p > Debug: Start Debugging >  VsCode Extension Development
+
+3. After changes are made to the source code you  must recompile the extension in step 1. and then you must restart the extension devlopment host to reflect the changes:
+    - ctrl+shift+F5
+____
 
 ## Contribute
 
