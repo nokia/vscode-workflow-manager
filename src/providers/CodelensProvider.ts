@@ -6,9 +6,7 @@
 
 import * as vscode from 'vscode';
 
-
-export class CodelensProvider implements vscode.CodeLensProvider
-{
+export class CodelensProvider implements vscode.CodeLensProvider {
 
 	ip: string;
 	constructor (ip: string) {

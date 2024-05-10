@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-'use strict'; // 
+'use strict';
 
 import * as vscode from 'vscode'; // import the vscode module (VS Code API)
 import * as os from 'os'; //  import operating system
@@ -131,7 +131,6 @@ export function activate(context: vscode.ExtensionContext) {
 		statusbar_examples.show();
 	}
 
-	// Add Workflow Manager to workspace
+	// Add Workflow Manager folder to workspace
 	vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders.length : 0, null, { uri: vscode.Uri.parse('wfm:/'), name: "Workflow Manager" });
-	// read all the filenames in the workspace
 }
