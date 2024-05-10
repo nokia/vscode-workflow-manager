@@ -60,3 +60,6 @@ Updates:
 * Updated backend logic to proccess the extensions along with the filenames.
 * tested functionality with filename extensions.
 * files are downladed to the local filesystem with the file extension/type included.
+* VsCode extension will only allow you to add/update/rename files with their correct extension.
+    - .action for actions
+    - .yaml for workflows
