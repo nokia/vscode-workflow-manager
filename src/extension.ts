@@ -6,13 +6,15 @@
 
 'use strict';
 
-import * as vscode from 'vscode';
-import * as os from 'os';
-import * as fs from 'fs';
+import * as vscode from 'vscode'; // import the vscode module (VS Code API)
+import * as os from 'os'; //  import operating system
+import * as fs from 'fs'; // import filesystem
 
-import { WorkflowManagerProvider, CodelensProvider } from './providers';
+// WorkflowManagerProvider is a class that contains all workflow operations.
+import { WorkflowManagerProvider, CodelensProvider } from './providers'; 
 
-export function activate(context: vscode.ExtensionContext) {
+// This function is ran once the the extension is activated:
+export function activate(context: vscode.ExtensionContext) {  
 	console.log('Workflow Manager says "Hello"');
 
 	const secretStorage: vscode.SecretStorage = context.secrets;
@@ -27,28 +29,31 @@ export function activate(context: vscode.ExtensionContext) {
 
 	console.log("Ignore labels:");
 	console.log(fileIgnore);
-
+	console.log(localpath);
+	console.log(localsave);
 	const wfmProvider = new WorkflowManagerProvider(server, username, secretStorage, port, localsave, localpath, timeout, fileIgnore);
 	context.subscriptions.push(vscode.workspace.registerFileSystemProvider('wfm', wfmProvider, { isCaseSensitive: true }));
 	context.subscriptions.push(vscode.window.registerFileDecorationProvider(wfmProvider));
 	wfmProvider.extContext=context;
-
-	const header = new CodelensProvider(server);
+	console.log("Workflow Manager Provider registered");
+	console.log(wfmProvider);
+	
+	const header = new CodelensProvider(server); 
 	context.subscriptions.push(vscode.languages.registerCodeLensProvider({language: 'yaml', scheme: 'wfm'}, header));
+	console.log(header)
+	// // PUBLISHING COMMANDS
 
-	// PUBLISHING COMMANDS
-
-	// --- Validate the definition in WFM
+	// // --- Validate the definition in WFM
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.validate', async () => {
 		wfmProvider.validate();
 	}));
 
-	// --- Open workflow in Workflow Manager (Webbrowser)
+	// // --- Open workflow in Workflow Manager (Webbrowser)
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.openInBrowser', async () => {
 		wfmProvider.openInBrowser();
 	}));
 
-	// --- Apply schema for validation
+	// // --- Apply schema for validation
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.applySchema', async () => {
 		wfmProvider.applySchema();
 	}));
@@ -58,17 +63,17 @@ export function activate(context: vscode.ExtensionContext) {
 		wfmProvider.execute();
 	}));
 
-	// --- Get last execution result
+	// // --- Get last execution result
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.lastResult', async () => {
 		wfmProvider.lastResult();
 	}));
 
-	// --- Upload workflow from local file-system
+	// // --- Upload workflow from local file-system
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.upload', async () => {
 		wfmProvider.upload();
 	}));
 
-	// Generate schema for validation
+	// // Generate schema for validation
 	wfmProvider.generateSchema();
 
 	// Apply YAML language to all wfm:/actions/* and wfm:/workflows/* files
@@ -77,8 +82,9 @@ export function activate(context: vscode.ExtensionContext) {
     fileAssociations["/workflows/*"] = "yaml";
     vscode.workspace.getConfiguration('files').update('associations', fileAssociations);
 
-	// --- WORKFLOW EXAMPLES -------------------------------------------------
-
+	// --- WORKFLOW EXAMPLES - When we click the bottom cloud button the nsp-workflow repo
+	// is cloned to the workspace-
+	// Add workflow examples to workspace (Bottom Cloud Button)
 	const statusbar_examples = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 91);
 	statusbar_examples.command = 'nokia-wfm.examples';
 	statusbar_examples.tooltip = 'Add workflow examples to workspace';
@@ -99,7 +105,7 @@ export function activate(context: vscode.ExtensionContext) {
 			vscode.commands.executeCommand('git.clone', 'https://github.com/nokia/nsp-workflow.git', gitPath);
 		}
 	}));
-
+	// Set Password for WFM
 	vscode.commands.registerCommand('nokia-wfm.setPassword', async () => {
 		const passwordInput: string = await vscode.window.showInputBox({
 		  password: true, 
@@ -125,6 +131,6 @@ export function activate(context: vscode.ExtensionContext) {
 		statusbar_examples.show();
 	}
 
-	// Add Workflow Manager to workspace
+	// Add Workflow Manager folder to workspace
 	vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders.length : 0, null, { uri: vscode.Uri.parse('wfm:/'), name: "Workflow Manager" });
 }

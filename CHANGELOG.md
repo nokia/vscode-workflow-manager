@@ -51,3 +51,15 @@ Updates:
 
 Updates:
 * Hide clear text password in settings.
+
+## [1.1.3]
+
+Updates:
+* Removed all compile errors/warnings from source code.
+* Added File Extensions to workflow and action files.
+* Updated backend logic to proccess the extensions along with the filenames.
+* tested functionality with filename extensions.
+* files are downladed to the local filesystem with the file extension/type included.
+* VsCode extension will only allow you to add/update/rename files with their correct extension.
+    - .action for actions
+    - .yaml for workflows
