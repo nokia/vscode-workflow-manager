@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-import { time } from 'console';
+import { Console, time } from 'console';
 import * as vscode from 'vscode';
 
 export class FileStat implements vscode.FileStat { // FileStat is a class that contains the file status
@@ -184,178 +184,239 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		return response;
 	}
 
-	// write workflow: Writes a workflow to the NSP and to the local file system
+	// write workflow: Writes a jinja2 template to the NSP and to the local file system
 	private async _writeTemplate(name: string, data: string): Promise<void> {
-		console.log('executing writeWorkflow()');
+		console.log('executing writeTemplate()'); // when adding a file if the file does not end with .jinja throw a vscode error and return
 		if (!name.endsWith('.jinja')) { // if the newName does not end with .yaml throw a vscode error and return
-			throw vscode.FileSystemError.NoPermissions('Template filename must end with .jinja');
+			throw vscode.FileSystemError.NoPermissions('Jinja Template filename must end with .jinja');
 		} else {
-			if (name in this.templates) {
-				// await this._updateTemplate(name, data, false);
-				console.log("Haven't yet done this implementation");
-				return;
+			if (name in this.templates) { // We are modifying an existing template (editor)
+				// make an api call to get the full template information and then update only the template attribute
+				let id = this.templates[name].id;
+				let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/jinja-template/"+id+"/definition";
+
+				await this._getAuthToken(); // get auth-token
+				const token = await this.authToken;
+				if (!token) {
+					throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+				}
+
+				let response: any = await this._callNSP(url, { // get workflow / action definition
+					method: 'GET',
+					headers: {
+						'Cache-Control': 'no-cache',
+						'Authorization': 'Bearer ' + token
+					}
+				});
+
+				if (!response){
+					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+				}
+
+				console.log("GET", url, response.status);
+				if (!response.ok) {
+					console.log(response);
+					throw vscode.FileSystemError.FileNotFound('Template not found');
+				}
+
+				let text = await response.text();
+				const yaml = require('yaml');
+				const doc = yaml.parse(text);
+				doc.template = data; // update the template attribute
+
+				await this._updateTemplate(name, yaml.stringify(doc));
 			} else {
-				console.log("Haven't yet done this implementation");
-				return;
-				// await this._createTemplate(data);
+				// make a new template with default values
+				let data = "---\nname: '"+name.replace('.jinja', '')+"'\ntemplate: ''\ntags: []\ndescription: null\nversion: '1.0.0'\nprovided_by: 'admin'";
+				await this._createTemplate(data);
 			}
 		}
 	}
 
-	// updateWorkflow: Updates an existing workflow
-	private async _updateTemplate(name: string, data: string, rename: boolean): Promise<void> {
-		// const yaml = require('yaml');
-		// const id = this.templates[name].id; // get the template id
-		// let defname = Object.keys(yaml.parse(data)).filter((value) => value !== "version")[0] + '.yaml';
-		// if ((defname !== name) && (!rename)) { // If the name in the definition is different from the filename and not a rename
-		// 	if (Object.keys(this.workflows).indexOf(defname)=== -1) { // if the  name is not in the workflows
-		// 		vscode.window.showInformationMessage('Workflow Name changed, creating new workflow.');
-		// 		await this._createWorkflow(data);
-		// 		let txtdoc = await vscode.workspace.openTextDocument( vscode.Uri.parse("wfm:/workflows/"+defname));
-		// 		vscode.window.showTextDocument(txtdoc);
-		// 	} else {
-		// 		vscode.window.showErrorMessage("Cloning to an existing Workflow name is not allowed!");
-		// 	}
-		// } else if (this.workflows[name].signed) {
-		// 	vscode.window.showErrorMessage("Unable to save SIGNED workflow. To create a copy, modify the name in the definition.");
-		// } else { // if we need to rename
-		// 	await this._getAuthToken(); // get auth-token
-		// 	const token = await this.authToken;
-		// 	if (!token) {
-		// 		throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-		// 	}
+	// updateWorkflow: Updates an template within the VsCode Editor:
+	private async _updateTemplate(name: string, data: string): Promise<void> {
+		console.log('executing updateTemplate()');
+		const yaml = require('yaml');
+		const id = this.templates[name].id; // get the template id
 
-		// 	// validate workflow definition
-		// 	let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/validate';
-		// 	let response: any = await this._callNSP(url, {
-		// 		method: 'POST',
-		// 		headers: {
-		// 			'Content-Type': 'text/plain',
-		// 			'Cache-Control': 'no-cache',
-		// 			'Authorization': 'Bearer ' + token
-		// 		},
-		// 		body: data
-		// 	});
-		// 	if (!response) {
-		// 		throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-		// 	}
+		await this._getAuthToken(); // get auth-token
+		const token = await this.authToken;
+		if (!token) {
+			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+		}
 
-		// 	console.log("POST", url, response.status);
-		// 	if (!response.ok) {
-		// 		throw vscode.FileSystemError.Unavailable('Workflow validation failed!');
-		// 	}
-		// 	let json = await response.json();
+		// API call to update template:
+		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/jinja-template/'+id;
+		console.log('url: ', url);
+		let response: any = await this._callNSP(url, {
+			method: 'PUT',
+			headers: {
+				'Content-Type': 'text/plain',
+				'Cache-Control': 'no-cache',
+				'Authorization': 'Bearer ' + token
+			},
+			body: data
+		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
 
-		// 	if (json.response.data.valid === 'false') {
-		// 		vscode.window.showErrorMessage(json.response.data.error);
-		// 		throw vscode.FileSystemError.NoPermissions('Invalid Workflow Definition');
-		// 	}
-		// 	vscode.window.showInformationMessage('Success: Workflow validated');
+		console.log("PUT", url, response.status);
+		console.log('response: ', response);
+		console.log('response statusText: ', response.statusText);	
+		if (!response.ok) {
+			throw vscode.FileSystemError.Unavailable('Template upload failed! Reason: '+response.statusText);
+		}
+		vscode.window.showInformationMessage('Success: Template uploaded to NSP');
+		console.log('response: ', response);
 
-		// 	// change to DRAFT
-		// 	url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/status';
-		// 	console.log('url: ', url);
-		// 	response = await this._callNSP(url, {
-		// 		method: 'PUT',
-		// 		headers: {
-		// 			'Content-Type': 'application/json',
-		// 			'Cache-Control': 'no-cache',
-		// 			'Authorization': 'Bearer ' + token
-		// 		},
-		// 		body: '{"status": "DRAFT"}'
-		// 	});
-		// 	if (!response){
-		// 		throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-		// 	}
+		// update the templates cache
+		let json = await response.json();
+		console.log('update json: ', json);
+		const entry =  json.response.data; 
 
-		// 	console.log("PUT", url, response.status);
-		// 	if (!response.ok) {
-		// 		throw vscode.FileSystemError.Unavailable('Change mode to DRAFT failed!');
-		// 	}
-		// 	vscode.window.showInformationMessage('Success: Enabled DRAFT mode');
+		this.templates[name].ctime = Date.parse(entry.created_at);
+		this.templates[name].mtime = Date.parse(entry.updated_at);
+		this.templates[name].size  = data.length;
 
-		// 	// upload workflow
-		// 	url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/definition';
-		// 	console.log('url: ', url);
-		// 	response = await this._callNSP(url, {
-		// 		method: 'PUT',
-		// 		headers: {
-		// 			'Content-Type': 'text/plain',
-		// 			'Cache-Control': 'no-cache',
-		// 			'Authorization': 'Bearer ' + token
-		// 		},
-		// 		body: data
-		// 	});
-		// 	if (!response){
-		// 		throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-		// 	}
-
-		// 	console.log("PUT", url, response.status);
-		// 	if (!response.ok) {
-		// 		throw vscode.FileSystemError.Unavailable('Workflow upload failed! Reason: '+response.statusText);
-		// 	}
-		// 	vscode.window.showInformationMessage('Success: Workflow uploaded');
-
-		// 	// update workflow cache
-		// 	json = await response.json();
-		// 	let entry = json.response.data[0];
-		// 	if (name !== defname) {
-		// 		vscode.window.showWarningMessage('Workflow renamed');
-		// 		delete this.workflows[name];
-		// 		const ctime = Date.parse(entry.created_at);
-		// 		const mtime = Date.parse(entry.updated_at);
-		// 		this.workflows[defname] = new FileStat(id, ctime, mtime, data.length, false);
-		// 		console.log('defName in workflows', defname);	
-		// 		this.readDirectory(vscode.Uri.parse("wfm:/workflows"));
-		// 	} else {
-		// 		this.workflows[name].ctime = Date.parse(entry.created_at);
-		// 		this.workflows[name].mtime = Date.parse(entry.updated_at);
-		// 		this.workflows[name].size  = data.length;	
-		// 	}
-
-		// 	// change to PUBLISHED
-		// 	url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/status';
-		// 	response = await this._callNSP(url, {
-		// 		method: 'PUT',
-		// 		headers: {
-		// 			'Content-Type': 'application/json',
-		// 			'Cache-Control': 'no-cache',
-		// 			'Authorization': 'Bearer ' + token
-		// 		},
-		// 		body: '{"status": "PUBLISHED"}'
-		// 	});
-		// 	if (!response){
-		// 		throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-		// 	}
-
-		// 	console.log("PUT", url, response.status);
-		// 	if (!response.ok) {
-		// 		throw vscode.FileSystemError.Unavailable('Change mode to PUBLISHED failed!');
-		// 	}
-		// 	vscode.window.showInformationMessage('Success: Workflow published');
-		// 	await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
-
-		// 	if (this.localsave===true) {
-		// 		let fs = require("fs");
-		// 		console.log("Saving a backup locally in the temp folder "+this.localpath);
-		// 		let extURI = vscode.Uri.parse("file://"+this.localpath);
-		// 		let filepath = vscode.Uri.joinPath(extURI, defname).toString().replace("file://","");
-		// 		console.log('filepath: ', filepath);
-		// 		console.log('extURI', extURI);
-		// 		fs.writeFile(filepath, data, (err) => {
-		// 			if(err) {
-		// 				console.log(err); 
-		// 			}
-		// 			console.log("Successfully saved in local repo."); 
-		// 		});
-		// 	}
+		// if (name !== defname) {
+		// 	// vscode.window.showWarningMessage('Workflow renamed');
+		// 	// delete this.workflows[name];
+		// 	// const ctime = Date.parse(entry.created_at);
+		// 	// const mtime = Date.parse(entry.updated_at);
+		// 	// this.workflows[defname] = new FileStat(id, ctime, mtime, data.length, false);
+		// 	// console.log('defName in workflows', defname);	
+		// 	// this.readDirectory(vscode.Uri.parse("wfm:/workflows"));
+		// } else {
+			// this.workflows[name].ctime = Date.parse(entry.created_at);
+			// this.workflows[name].mtime = Date.parse(entry.updated_at);
+			// this.workflows[name].size  = data.length;	
 		// }
-		// console.log('completed updating workflow');
+
+		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+
+		if (this.localsave===true) {
+			let fs = require("fs");
+			console.log("Saving a backup locally in the temp folder "+this.localpath);
+			let extURI = vscode.Uri.parse("file://"+this.localpath);
+			let filepath = vscode.Uri.joinPath(extURI, name).toString().replace("file://","");
+			console.log('filepath: ', filepath);
+			console.log('extURI', extURI);
+			fs.writeFile(filepath, data, (err) => {
+				if(err) {
+					console.log(err); 
+				}
+				console.log("Successfully saved in local repo."); 
+			});
+		}
+		console.log('completed updating template');
 		return;
 	}
 
-	private async _createTemplate(): Promise<void> {
-		return;
+	private async _createTemplate(data: string): Promise<void> {
+		console.log('executing _createTemplate()');
+		await this._getAuthToken(); // get auth-token
+		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
+		console.log('defualt data: ', data);
+		// validate template definition
+		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/jinja-template/validate';
+		let response: any = await this._callNSP(url, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'text/plain',
+				'Cache-Control': 'no-cache',
+				'Authorization': 'Bearer ' + token
+			},
+			body: data
+		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
+
+		console.log("POST", url, response.status);
+		if (!response.ok) {
+			throw vscode.FileSystemError.Unavailable('Template validation failed!');
+		}
+		let json = await response.json();
+
+		if (json.response.data.valid === 'false') {
+			vscode.window.showErrorMessage(json.response.data.error);
+			throw vscode.FileSystemError.NoPermissions('Invalid Template Definition');
+		}
+		vscode.window.showInformationMessage('Success: Template validated');
+
+		// upload new Template
+		url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/jinja-template';
+		response = await this._callNSP(url, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'text/plain',
+				'Cache-Control': 'no-cache',
+				'Authorization': 'Bearer ' + token
+			},
+			body: data
+		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
+
+		console.log("POST", url, response.status);
+		if (!response.ok) {
+			throw vscode.FileSystemError.Unavailable('Template creation failed! Reason: '+response.statusText);
+		}
+		vscode.window.showInformationMessage('Success: Template uploaded');
+
+		// update template cache
+		json = await response.json();
+
+		// access the data attribute from the json
+		const entry =  json.response.data;
+		const name = entry.name + '.jinja';
+		const id = entry.id;
+		const ctime = Date.parse(entry.created_at);
+		const mtime = Date.parse(entry.updated_at);
+		this.templates[name] = new FileStat(id, ctime, mtime, data.length, false);
+
+		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+		vscode.window.showInformationMessage('Success: Template published');
+	}
+
+	// deleteWorkflow: Deletes a workflow
+	private async _deleteTemplate(name: string): Promise<void> {
+
+		const id : string = this.templates[name].id;
+
+		// get auth-token
+		await this._getAuthToken();
+		const token = await this.authToken;
+		if (!token) {
+			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+		}
+
+		// delete template
+		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/jinja-template/'+id.replace('.jinja', '');
+		let response: any = await this._callNSP(url, {
+			method: 'DELETE',
+			headers: {
+				'Cache-Control': 'no-cache',
+				'Authorization': 'Bearer ' + token
+			}
+		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
+
+		console.log("DELETE", url, response.status);
+		if (!response.ok) {
+			throw vscode.FileSystemError.Unavailable('Template deletion failed! Reason: '+response.statusText);
+		}
+		vscode.window.showInformationMessage('Success: Template deleted');
+
+		// update workflow cache
+		delete this.templates[name];
 	}
 
 	// --- private methods: WFM workflows
@@ -694,6 +755,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	// write workflow: Writes a workflow to the NSP and to the local file system
 	private async _writeWorkflow(name: string, data: string): Promise<void> {
+		console.log('name: ', name);
 		console.log('executing writeWorkflow()');
 		if (!name.endsWith('.yaml')) { // if the newName does not end with .yaml throw a vscode error and return
 			throw vscode.FileSystemError.NoPermissions('Workflow filename must end with .yaml');
@@ -702,7 +764,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				await this._updateWorkflow(name, data, false);
 			} else {
 				if (data.length === 0) {
-					data = "---\nversion: '2.0'\n\n"+name+":\n  type: direct\n\n  description: this is a new workflow\n  \n  tags:\n    - demo\n\n  input:\n    - number1: 1234\n    - number2: 123\n    - ipAddress: '127.0.0.1'\n    - someText: 'my default value'\n    - pass: false\n    - delay: 1\n    - passRatio: 30\n\n  output:\n    devices: <% $.nodeList %>\n    sysinfo: <% $.sysInfo %>\n    rttinfo: <% $.rttInfo %>\n    time: <% $.timeInfo %>\n    \n  output-on-error:\n    result: 'Error occured, check logs for details'\n\n  tasks:\n    task1:\n      action: std.echo\n      input:\n        output:\n          someMath: <% $.number1 - $.number2 %>\n      publish:\n        randomNbr: <% 100*random() %>\n      on-success:\n        - pingLocalHost\n\n    pingLocalHost:\n      action: nsp.ping\n      input:\n        host: 127.0.0.1\n        duration: 1\n      publish:\n        rttInfo: <% task().result.RTT %>\n      on-success:\n        - getPythonVersionAndModules\n        - getTimestamp\n        - getNodes\n      on-error:\n        - fail\n\n    getNodes:\n      action: nsp.https\n      input:\n        url: 'https://restconf-gateway/restconf/operations/nsp-inventory:find'\n        method: POST\n        body: \n          input:\n            xpath-filter: /nsp-equipment:network/network-element\n            offset: 0\n            limit: 100\n            fields: ne-id;ne-name;ip-address;version;location;type;product\n            sort-by:\n              - ne-name\n      publish:\n        nodeList: <% task().result.content['nsp-inventory:output'] %>\n      on-complete:\n        - continue\n\n    getPythonVersionAndModules:\n      action: nsp.python\n      input:\n        context: <% $ %>\n        script: |\n          import sys\n          import platform\n          import pkg_resources\n\n          rvalue = {}\n          rvalue['sys.version']=sys.version\n          rvalue['platform.python_version']=platform.python_version()\n          rvalue['packages'] = sorted(['%s==%s' % (i.key, i.version) for i in pkg_resources.working_set])\n\n          return rvalue\n      publish:\n        sysInfo: <% task().result %>\n      on-complete:\n        - continue\n\n    getTimestamp:\n      action: std.js\n      input:\n        script: |\n          function getTS() {\n            const date = new Date();\n            let now = date.getTime();\n            return now;\n          }\n          return getTS();\n      publish:\n        timeInfo: <% task().result %>\n      on-complete:\n        - continue\n        \n    continue:\n      join: all    \n      action: std.noop\n      on-success:\n        - randomFailure: <% not $.pass %>\n        - done: <% $.pass %>\n        \n    randomFailure:\n      action: nsp.assert\n      input:\n        input: <% $.randomNbr < $.passRatio %>\n        expected: true\n        shouldFail: true\n      publish:\n        result: 'I am happy'\n      publish-on-error:\n        result: 'I am unhappy'\n      on-error:\n        - handleFailure\n      on-success:\n        - done\n\n    handleFailure:\n      action: std.sleep\n      input:\n        seconds: <% $.delay %>\n      on-success:\n        - done\n\n    done:\n      action: std.noop\n";
+					data = "---\nversion: '2.0'\n\n"+name.replace('.yaml', '')+":\n  type: direct\n\n  description: this is a new workflow\n  \n  tags:\n    - demo\n\n  input:\n    - number1: 1234\n    - number2: 123\n    - ipAddress: '127.0.0.1'\n    - someText: 'my default value'\n    - pass: false\n    - delay: 1\n    - passRatio: 30\n\n  output:\n    devices: <% $.nodeList %>\n    sysinfo: <% $.sysInfo %>\n    rttinfo: <% $.rttInfo %>\n    time: <% $.timeInfo %>\n    \n  output-on-error:\n    result: 'Error occured, check logs for details'\n\n  tasks:\n    task1:\n      action: std.echo\n      input:\n        output:\n          someMath: <% $.number1 - $.number2 %>\n      publish:\n        randomNbr: <% 100*random() %>\n      on-success:\n        - pingLocalHost\n\n    pingLocalHost:\n      action: nsp.ping\n      input:\n        host: 127.0.0.1\n        duration: 1\n      publish:\n        rttInfo: <% task().result.RTT %>\n      on-success:\n        - getPythonVersionAndModules\n        - getTimestamp\n        - getNodes\n      on-error:\n        - fail\n\n    getNodes:\n      action: nsp.https\n      input:\n        url: 'https://restconf-gateway/restconf/operations/nsp-inventory:find'\n        method: POST\n        body: \n          input:\n            xpath-filter: /nsp-equipment:network/network-element\n            offset: 0\n            limit: 100\n            fields: ne-id;ne-name;ip-address;version;location;type;product\n            sort-by:\n              - ne-name\n      publish:\n        nodeList: <% task().result.content['nsp-inventory:output'] %>\n      on-complete:\n        - continue\n\n    getPythonVersionAndModules:\n      action: nsp.python\n      input:\n        context: <% $ %>\n        script: |\n          import sys\n          import platform\n          import pkg_resources\n\n          rvalue = {}\n          rvalue['sys.version']=sys.version\n          rvalue['platform.python_version']=platform.python_version()\n          rvalue['packages'] = sorted(['%s==%s' % (i.key, i.version) for i in pkg_resources.working_set])\n\n          return rvalue\n      publish:\n        sysInfo: <% task().result %>\n      on-complete:\n        - continue\n\n    getTimestamp:\n      action: std.js\n      input:\n        script: |\n          function getTS() {\n            const date = new Date();\n            let now = date.getTime();\n            return now;\n          }\n          return getTS();\n      publish:\n        timeInfo: <% task().result %>\n      on-complete:\n        - continue\n        \n    continue:\n      join: all    \n      action: std.noop\n      on-success:\n        - randomFailure: <% not $.pass %>\n        - done: <% $.pass %>\n        \n    randomFailure:\n      action: nsp.assert\n      input:\n        input: <% $.randomNbr < $.passRatio %>\n        expected: true\n        shouldFail: true\n      publish:\n        result: 'I am happy'\n      publish-on-error:\n        result: 'I am unhappy'\n      on-error:\n        - handleFailure\n      on-success:\n        - done\n\n    handleFailure:\n      action: std.sleep\n      input:\n        seconds: <% $.delay %>\n      on-success:\n        - done\n\n    done:\n      action: std.noop\n";
 				}
 				await this._createWorkflow(data);
 			}
@@ -970,7 +1032,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				await this._updateAction(name, data);
 			} else {
 				if (data.length === 0) {
-					data = "---\nversion: '2.0'\n\n"+name+":\n  description: |\n    action: "+name+"\n  base: nsp.https\n  base-input:\n    url: 'https://restconf-gateway/restconf/operations/nsp-inventory:find'\n    method: POST\n    auth: <% $.token_auth %>      \n    body: \n      input:\n        xpath-filter: /nsp-equipment:network/network-element<% xpath_filter($.formValues.get('filter')) %>\n        offset: <% $.formValues.get('offset') %>\n        limit: <% $.formValues.get('limit') %>\n        fields: ne-id;ne-name;ip-address;version;location;type;product\n        sort-by:\n          - ne-id\n  input:\n    - token_auth\n    - formValues: {}\n  output: <% $.content['nsp-inventory:output'] %>\n";
+					data = "---\nversion: '2.0'\n\n"+name.replace('.action' ,'')+":\n  description: |\n    action: "+name+"\n  base: nsp.https\n  base-input:\n    url: 'https://restconf-gateway/restconf/operations/nsp-inventory:find'\n    method: POST\n    auth: <% $.token_auth %>      \n    body: \n      input:\n        xpath-filter: /nsp-equipment:network/network-element<% xpath_filter($.formValues.get('filter')) %>\n        offset: <% $.formValues.get('offset') %>\n        limit: <% $.formValues.get('limit') %>\n        fields: ne-id;ne-name;ip-address;version;location;type;product\n        sort-by:\n          - ne-id\n  input:\n    - token_auth\n    - formValues: {}\n  output: <% $.content['nsp-inventory:output'] %>\n";
 				}
 				await this._createAction(data);
 			}
@@ -1617,12 +1679,15 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		console.log('executing writeFile()');
 		if (uri.toString().startsWith('wfm:/workflows/')) {
 			const key = uri.toString().substring(15);
+			console.log('content: ', content.toString());
 			await this._writeWorkflow(key, content.toString());
 		} else if (uri.toString().startsWith('wfm:/actions/')) {
 			const key = uri.toString().substring(13);
+			console.log('content: ', content.toString());
 			await this._writeAction(key, content.toString());
 		} else if (uri.toString().startsWith('wfm:/templates/')) {
 			const key = uri.toString().substring(15);
+			console.log('content: ', content.toString());
 			await this._writeTemplate(key, content.toString());
 		} else {
 			throw vscode.FileSystemError.FileNotFound('Unknown resource-type!');
@@ -1664,6 +1729,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		} else if (uri.toString().startsWith("wfm:/actions/")) {
 			let key = uri.toString().substring(13);
 			await this._deleteAction(key);
+		} else if (uri.toString().startsWith("wfm:/templates/")) {
+			let key = uri.toString().substring(15);
+			await this._deleteTemplate(key);
 		} else {
 			throw vscode.FileSystemError.FileNotFound('Unknown resouces!');
 		}
