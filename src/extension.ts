@@ -43,32 +43,32 @@ export function activate(context: vscode.ExtensionContext) {
 	console.log(header)
 	// // PUBLISHING COMMANDS
 
-	// // --- Validate the definition in WFM
+	// // --- A handler for the 'nokia-wfm.validate' command when the user clicks the checkmark
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.validate', async () => {
 		wfmProvider.validate();
 	}));
 
-	// // --- Open workflow in Workflow Manager (Webbrowser)
+	// // --- A handler to Open workflow in Workflow Manager (Webbrowser) when the user clicks the link
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.openInBrowser', async () => {
 		wfmProvider.openInBrowser();
 	}));
 
-	// // --- Apply schema for validation
+	// // --- A handler to Apply schema for validation when the schema is not applied
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.applySchema', async () => {
 		wfmProvider.applySchema();
 	}));
 
-	// --- Run workflow in WFM
+	// --- A handler to Execute workflow in Workflow Manager when the user clicks the play button
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.execute', async () => {
 		wfmProvider.execute();
 	}));
 
-	// // --- Get last execution result
+	// // --- Get last execution result - when the user clicks the eye button
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.lastResult', async () => {
 		wfmProvider.lastResult();
 	}));
 
-	// // --- Upload workflow from local file-system
+	// // --- Upload workflow from local file-system when 
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.upload', async () => {
 		wfmProvider.upload();
 	}));
@@ -80,6 +80,7 @@ export function activate(context: vscode.ExtensionContext) {
 	let fileAssociations : {string: string} = vscode.workspace.getConfiguration('files').get('associations') || <{string: string}>{};
     fileAssociations["/actions/*"] = "yaml";
     fileAssociations["/workflows/*"] = "yaml";
+	fileAssociations["/templates/*"] = "jinja";
     vscode.workspace.getConfiguration('files').update('associations', fileAssociations);
 
 	// --- WORKFLOW EXAMPLES - When we click the bottom cloud button the nsp-workflow repo

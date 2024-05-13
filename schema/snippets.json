@@ -1,0 +1,402 @@
+{
+	"file.chksumMD5": {
+		"scope": "yaml",
+		"prefix": "file.chksumMD5",
+		"description": "calculate hash",
+		"body": [
+			"getChecksum:\n  action: file.chksumMD5\n  input:\n    folder: /tmp\n    filename: file1\n"
+		]
+	},
+	"file.chksumSHA256": {
+		"scope": "yaml",
+		"prefix": "file.chksumSHA256",
+		"description": "calculate hash",
+		"body": [
+			"getChecksum:\n  action: file.chksumSHA256\n  input:\n    folder: /tmp\n    filename: file1\n"
+		]
+	},
+	"file.read": {
+		"scope": "yaml",
+		"prefix": "file.read",
+		"description": "Read CSV file",
+		"body": [
+			"readCSV:\n  action: file.read\n  input:\n    filename: /tmp/data.csv\n"
+		]
+	},
+	"file.remove": {
+		"scope": "yaml",
+		"prefix": "file.remove",
+		"description": "Delete files",
+		"body": [
+			"filesDeletion:\n  action: file.remove\n  input:\n    filesnames:\n      - /tmp/file1\n      - /tmp/file2\n"
+		]
+	},
+	"file.rename": {
+		"scope": "yaml",
+		"prefix": "file.rename",
+		"description": "Rename a file",
+		"body": [
+			"fileRename:\n  action: file.rename\n  input:\n    old: /tmp/file1\n    new: /tmp/file1.bak\n"
+		]
+	},
+	"file.write": {
+		"scope": "yaml",
+		"prefix": "file.write",
+		"description": "Write HTML file",
+		"body": [
+			"writeHTML:\n  action: file.write\n  input:\n    folder: /tmp/wfm/demo\n    filename: report_2019-09-26-10:15:22.html\n    data: <% $.html %>\n    mode: w\n"
+		]
+	},
+	"folder.create": {
+		"scope": "yaml",
+		"prefix": "folder.create",
+		"description": "Create folder",
+		"body": [
+			"folderCreation:\n  action: folder.create\n  input:\n    foldername: /tmp/wfm/demo\n"
+		]
+	},
+	"folder.list": {
+		"scope": "yaml",
+		"prefix": "folder.list",
+		"description": "List folders",
+		"body": [
+			"folderDeletion:\n  action: folder.list\n  input:\n    foldername: /tmp/wfm/demo\n"
+		]
+	},
+	"folder.remove": {
+		"scope": "yaml",
+		"prefix": "folder.remove",
+		"description": "Remove folder",
+		"body": [
+			"folderDeletion:\n  action: folder.remove\n  input:\n    foldername: /tmp/wfm/demo\n"
+		]
+	},
+	"netconf.configure": {
+		"scope": "yaml",
+		"prefix": "netconf.configure",
+		"description": "example1",
+		"body": [
+			"setLocationShort:\n  action: netconf.configure\n  input:\n    neId: 10.0.2.5\n    content: >-\n      <nc:config xmlns:nc=\"urn:ietf:params:xml:ns:netconf:base:1.0\">\n        <configure xmlns=\"urn:nokia.com:sros:ns:yang:sr:conf\">\n          <system>\n            <location>Ottawa</location>\n          </system>\n        </configure>\n      </nc:config>\n"
+		]
+	},
+	"netconf.getcfg": {
+		"scope": "yaml",
+		"prefix": "netconf.getcfg",
+		"description": "example1",
+		"body": [
+			"getAllConfig:\n  action: netconf.getcfg\n  input:\n    connectInfo:\n      host: 10.0.0.10\n      port: 830\n      username: admin\n      password: admin\n      hostkey_verify: False\n"
+		]
+	},
+	"nsp.cleanUpPolicyAction": {
+		"scope": "yaml",
+		"prefix": "nsp.cleanUpPolicyAction",
+		"description": "example1",
+		"body": [
+			"deleteExecutionsOlderThan30Days:\n    action: nsp.cleanUpPolicyAction\n    input:\n    policy:\n        name: Default\n        state: ERROR\n        older_than: 30\n        operation: DELETE\n"
+		]
+	},
+	"nsp.cli": {
+		"scope": "yaml",
+		"prefix": "nsp.cli",
+		"description": "Test SR CLI",
+		"body": [
+			"testSSH:\n  action: nsp.cli\n  input:\n    cmds:\n      - \"show time\"\n      - \"show users\"\n      - command: \"show users\"\n        resultFilter: \"$.split('\\r\\n').where($.indexOf('Number of users') = 0 )\"\n    host: \"135.228.2.2\"\n    username: \"admin\"\n    password: \"admin\"\n    stopOn: '.*(MINOR|MAJOR|CRITICAL|Error): .*([\\s\\S]*?)#'\n    resultFilter: 'regex(\"[\\r\\n]*(\\!?\\*?\\[.*\\][\\r\\n]+)?[ABCD]\\:\\S+[#$]\\s\").replace($, \"\").split(\"\\r\\n\").delete(0).where($)'\n    timeout: 20\n    prompt: auto\n"
+		]
+	},
+	"nsp.diff": {
+		"scope": "yaml",
+		"prefix": "nsp.diff",
+		"description": "Test Diff",
+		"body": [
+			"testDiff:\n  action: nsp.diff\n  input:\n   fromlines: |\n     this is an example\n     this is line 2 of the example\n   tolines: |\n     this is an example of test.diff\n     this is line 2 of the example\n   fromdesc: fromColumn\n   todesc: toColumn\n   mode: doc\n   context: false\n   numlines: 5\n   tabsize: 8\n   wrapsize:\n"
+		]
+	},
+	"nsp.environment": {
+		"scope": "yaml",
+		"prefix": "nsp.environment",
+		"description": "Read environment",
+		"body": [
+			"readEnv:\n  action: nsp.environment\n  input:\n    environment: demo\n    operation: get\n"
+		]
+	},
+	"nsp.exec_update": {
+		"scope": "yaml",
+		"prefix": "nsp.exec_update",
+		"description": "Test Update",
+		"body": [
+			"testDescUpdate:\n  action: nsp.exec_update\n  input:\n   description: |\n     this is an example\n     this is line 2 of the example\n"
+		]
+	},
+	"nsp.generic_mediator": {
+		"scope": "yaml",
+		"prefix": "nsp.generic_mediator",
+		"description": "Test nsp.generic_mediator",
+		"body": [
+			"getWorkflowNames:\n  action: nsp.generic_mediator\n  input:\n    name: altiplano-ac\n    url: https://1.1.1.1/rest/restconf/operations/ibn-administration:search-intent-types\n    resultFilter: $.content['ibn-administration:output']['intent-type'].name\n"
+		]
+	},
+	"nsp.GroupCreation": {
+		"scope": "yaml",
+		"prefix": "nsp.GroupCreation",
+		"description": "Test nsp.GroupCreation",
+		"body": [
+			"createNetworkSupervisionGroup:\n  action: nsp.GroupCreation\n  input:\n    url: https://group-manager/group-manager/rest/api/v1/groups?category=networkSupervision\n    method: POST\n    contentType: application/json\n    accept: application/json\n    advancedFilterExpression: \"(product equal '7750 SR')\"\n    alarmsSeverity: 'critical'\n    filterEditable: true\n    groupDescription: '7750 SR group'\n    groupDirectoryFdn: 'fdn:model:group:NetworkSupervisionView:3502'\n    groupName: 'sajjad'\n    usePhysicalMapLayout: false\n    resultFilter: $.content.response.data.links[0].href\n    jsonPathSuccess: \"$[?(@.name == \\\"<# $.split('?category')[0].split('/name/')[1] #>\\\" && @.fdn contains \\\"fdn:model:group:NetworkSupervisionGroup\\\")]\"\n    jsonPathError: ''\n    kafkaTopic: nsp-db-group\n    eventType: CREATE\n    timeout: 60\n"
+		]
+	},
+	"nsp.https": {
+		"scope": "yaml",
+		"prefix": "nsp.https",
+		"description": "Test nsp.https",
+		"body": [
+			"getWorkflowNames:\n  action: nsp.https\n  input:\n    url: https://1.1.1.1:8546/wfm/apiv1/workflow\n    resultFilter: $.content.response.data.name\n"
+		]
+	},
+	"nsp.https_async": {
+		"scope": "yaml",
+		"prefix": "nsp.https_async",
+		"description": "Test nsp.https_async",
+		"body": [
+			"transferFileToNSP:\n  action: nsp.https_async\n  input:\n    url: https://file-transfer-service/nsp-file-transfer-service-app/rest/api/v1/getFile\n    method: POST\n    body: \n      destinationPath: /tmp\n      ipAddress: 1.1.1.1\n      password: <% $.password %>\n      port: '22'\n      protocol: SFTP\n      retries: '5'\n      sourcePath: /tls\n      userName: admin\n    resultFilter: $.content\n    jsonPathSuccess: '$[?(@.transferStatus == \"COMPLETED\" && @.transferId == \"<# $.transferId #>\")]'\n    jsonPathError: '$[?(@.transferStatus == \"FAILED\" && @.transferId == \"<# $.transferId #>\")]'\n    kafkaTopic: nsp-file-service\n"
+		]
+	},
+	"nsp.jinja_template": {
+		"scope": "yaml",
+		"prefix": "nsp.jinja_template",
+		"description": "Test Jinja Template",
+		"body": [
+			"testJinjaTemplate:\n  action: nsp.jinja_template\n  input:\n    name: \"myTemplate\"\n    data: {'key': 'value'}\n"
+		]
+	},
+	"nsp.JobCreation": {
+		"scope": "yaml",
+		"prefix": "nsp.JobCreation",
+		"description": "Test nsp.JobCreation",
+		"body": [
+			"createJob:\n  action: nsp.GroupCreation\n  input:\n    url: https://restconf-gateway/restconf/data/nsp-jobs-manager:jobs-manager\n    method: POST\n    contentType: application/json\n    accept: application/json\n    name: \"wfm-adhoc-action-job\"\n    owner: \"wfm-adhoc-action-owner\"\n    taskName: \"wfm-adhoc-action-task\"\n    payload: \"WFM Adhoc action example\"\n    queueName: toronto\n    order: 1\n    priority: 1\n    resultFilter: $.content\n    kafkaTopic: nsp-yang-model.change-notif\n    eventType: JSON\n    timeout: 3600\n"
+		]
+	},
+	"nsp.kafka_producer": {
+		"scope": "yaml",
+		"prefix": "nsp.kafka_producer",
+		"description": "Test Kafka Producer",
+		"body": [
+			"testKafkaProducer:\n  action: std.kafka_producer\n  input:\n    topic: \"nsp.wfm_webhook\"\n    key: wfm\n    msgFormat: json\n    authorization: ''\n    msgs:\n     - {'key': 'value'}\n     - {'key2': 'value2'}\n"
+		]
+	},
+	"nsp.mdm_cli": {
+		"scope": "yaml",
+		"prefix": "nsp.mdm_cli",
+		"description": "Test MDM CLI",
+		"body": [
+			"testMDMCLI:\n  action: nsp.mdm_cli\n  input:\n    neId: \"1.1.1.1\"\n    cmds:\n      - show bof\n    sessionId: \"new\"\n    stopOn: '(\\^*)[\\r\\n]*(MINOR:)([\\s\\S]*)'\n    interactions: {\n      'Are you sure you want to reboot (y/n)?': 'n'\n    }\n    idleTimeOut: 120\n"
+		]
+	},
+	"nsp.ping": {
+		"scope": "yaml",
+		"prefix": "nsp.ping",
+		"description": "Ping using hostnames",
+		"body": [
+			"pingTestHost:\n  action: nsp.ping\n  input:\n    host: localhost\n    duration: 10\n"
+		]
+	},
+	"nsp.python": {
+		"scope": "yaml",
+		"prefix": "nsp.python",
+		"description": "Test Python Code",
+		"body": [
+			"testPython:\n  action: nsp.python\n  input:\n    script: |\n      import urllib.parse\n      def myFunction(encode):\n        output = urllib.parse.quote(encode)\n        output = output.replace('/', '%2F')\n        LOG.info(\"python action logging into executor logs\")\n        #LOG.info('context object=%s', context['var'])\n        return output\n      return myFunction('Port 1/1/1');\n"
+		]
+	},
+	"nsp.shell": {
+		"scope": "yaml",
+		"prefix": "nsp.shell",
+		"description": "Create TAR ball",
+		"body": [
+			"zipTest:\n  action: nsp.shell\n  input:\n    command: tar -czf /tmp/demo.tgz /mnt\n"
+		]
+	},
+	"nsp.sr_cli": {
+		"scope": "yaml",
+		"prefix": "nsp.sr_cli",
+		"description": "Test SR CLI",
+		"body": [
+			"testSSH:\n  action: nsp.sr_cli\n  input:\n    cmd: \"show time\"\n    host: \"135.228.2.2\"\n    username: \"admin\"\n    password: \"admin\"\n"
+		]
+	},
+	"nsp.sr_cli_v2": {
+		"scope": "yaml",
+		"prefix": "nsp.sr_cli_v2",
+		"description": "Test SR CLI",
+		"body": [
+			"testSRCLI:\n  action: nsp.sr_cli_v2\n  input:\n    host: \"135.228.2.2\"\n    username: \"admin\"\n    password: \"admin\"\n    cmd: \n      - \"show time\"\n      - \"show users\"\n      - command: \"show users\"\n        resultFilter: 'regex(\"[\\\\r\\\\n]*(\\!?\\*?\\[.*\\][\\r\\n]+)?[ABCD]\\:\\S+[#$]\\s\").replace($, \"\").split(\"\\r\\n\").delete(0).where($)'\n      - show port 1/1/1 access ingress pool slope-policy 23\n"
+		]
+	},
+	"nsp.textFSM": {
+		"scope": "yaml",
+		"prefix": "nsp.textFSM",
+		"description": "SROS show version",
+		"body": [
+			"parseVersion:\n  action: nsp.textFSM\n  input:\n    response: |\n      TiMOS-B-19.10.R2 both/x86_64 Nokia 7750 SR\n      Copyright (c) 2000-2019 Nokia.\n      All rights reserved.\n      All use subject to applicable license agreements.\n      Built on Mon Dec 16 15:37:51 PST 2019\n      by builder in /builds/c/1910B/R2/panos/main\n    template: |\n      Value VERSION (\\S+OS\\S+)\n\n      Start\n        ^${VERSION}\\s\n"
+		]
+	},
+	"nsp.uploadFile": {
+		"scope": "yaml",
+		"prefix": "nsp.uploadFile",
+		"description": "Test nsp.uploadFile",
+		"body": [
+			"uploadNodeBackup:\n  action: nsp.uploadFile\n  input:\n    fileServicePath: /tmp\n    localFilePath: /tmp/backup.cfg\n"
+		]
+	},
+	"nsp.user_input": {
+		"scope": "yaml",
+		"prefix": "nsp.user_input",
+		"description": "Simple User Prompt to Accept or Reject Service Deletion",
+		"body": [
+			"operatorConfimation:\n  action: nsp.user_input\n  input:\n    title: Service Operator Confirmation\n    message: User John wants to update the following 10 (...) services\n    successAction: Confirm\n    errorAction: Deny\n"
+		]
+	},
+	"nspWebUI.intentTypeListWithDetails": {
+		"scope": "yaml",
+		"prefix": "nspWebUI.intentTypeListWithDetails",
+		"description": "List of intent-types",
+		"body": [
+			"getIntentTypes:\n  action: nspWebUI.intentTypeListWithDetails\n  input: \n    token_auth: \"\"\n    formValues: {}\n"
+		]
+	},
+	"nspWebUI.neListPaged": {
+		"scope": "yaml",
+		"prefix": "nspWebUI.neListPaged",
+		"description": "List all nodes",
+		"body": [
+			"getAllNodes:\n  action: nspWebUI.neListPaged\n  input: \n    token_auth:\n    formValues: {}\n"
+		]
+	},
+	"nspWebUI.portList": {
+		"scope": "yaml",
+		"prefix": "nspWebUI.portList",
+		"description": "List of all ports",
+		"body": [
+			"getAllPorts:\n  action: nspWebUI.portList\n  input: \n    token_auth: \"\"\n    formValues: {}\n"
+		]
+	},
+	"nspWebUI.portListPaged": {
+		"scope": "yaml",
+		"prefix": "nspWebUI.portListPaged",
+		"description": "List all ports",
+		"body": [
+			"getAllPorts:\n  action: nspWebUI.portListPaged\n  input: \n    token_auth:\n    formValues: {}\n"
+		]
+	},
+	"nsp.yaql_eval": {
+		"scope": "yaml",
+		"prefix": "nsp.yaql_eval",
+		"description": "Test nsp.yaql_eval",
+		"body": [
+			"getWorkflowNames:\n  action: nsp.yaql_eval\n  input:\n    context:\n        port:\n            neId: '1.1.1.1'\n            encap: 'QinQ'\n    expression: $.port\n"
+		]
+	},
+	"std.async_noop": {
+		"scope": "yaml",
+		"prefix": "std.async_noop",
+		"description": "Test Async Noop",
+		"body": [
+			"testAsyncNoop:\n  action: std.async_noop\n"
+		]
+	},
+	"std.echo": {
+		"scope": "yaml",
+		"prefix": "std.echo",
+		"description": "Test Echo",
+		"body": [
+			"testEcho:\n  action: std.echo\n  input:\n    output: \"Echo This\"\n"
+		]
+	},
+	"std.email": {
+		"scope": "yaml",
+		"prefix": "std.email",
+		"description": "Test Email",
+		"body": [
+			"testEmail:\n  action: std.email\n  input:\n    from_addr: \"test1@gmail.com\"\n    to_addrs: [\"test2@gmail.com\"]\n    smtp_server: \"135.228.2.2\"\n    smtp_password: \"password\"\n    subject: \"Test Email\"\n    body: \"Hi, Email Test\"\n    attachments: [\"/tmp/test.doc\", \"/tmp/test/results.zip\"]\n"
+		]
+	},
+	"std.fail": {
+		"scope": "yaml",
+		"prefix": "std.fail",
+		"description": "Test Fail",
+		"body": [
+			"testFail:\n  action: std.fail\n  input:\n    error_data: \"Failed Fetch\"\n"
+		]
+	},
+	"std.http": {
+		"scope": "yaml",
+		"prefix": "std.http",
+		"description": "Test HTTP",
+		"body": [
+			"testHTTP:\n  action: std.http\n  input:\n    url: \"https://jsonplaceholder.typicode.com/todos/1\"\n    method: \"GET\"\n    verify: False\n"
+		]
+	},
+	"std.javascript": {
+		"scope": "yaml",
+		"prefix": "std.javascript",
+		"description": "Test Javascript",
+		"body": [
+			"testJS:\n  action: std.javascript\n  input:\n    script: |\n      function myFunction(){\n        var a = new Date();\n        var b = a.getTime();\n        var c = 1000;\n        var d = b - c;\n        return String(d);\n      }\n      return myFunction();\n"
+		]
+	},
+	"std.noop": {
+		"scope": "yaml",
+		"prefix": "std.noop",
+		"description": "Test Noop",
+		"body": [
+			"testNoop:\n  action: std.noop\n"
+		]
+	},
+	"std.sleep": {
+		"scope": "yaml",
+		"prefix": "std.sleep",
+		"description": "Test Sleep",
+		"body": [
+			"testSleep:\n  action: std.sleep\n  input:\n    seconds: 2\n"
+		]
+	},
+	"std.ssh": {
+		"scope": "yaml",
+		"prefix": "std.ssh",
+		"description": "Test SSH",
+		"body": [
+			"testSSH:\n  action: std.ssh\n  input:\n    cmd: \"ls /opt/nsp\"\n    host: \"135.228.2.2\"\n    username: \"root\"\n    password: \"password\"\n"
+		]
+	},
+	"std.ssh_proxied": {
+		"scope": "yaml",
+		"prefix": "std.ssh_proxied",
+		"description": "Test SSH Proxied",
+		"body": [
+			"testSSHProxied:\n  action: std.ssh_proxied\n  input:\n    cmd: \"ls /opt/nsp\"\n    proxy_command: \"ls /opt\"\n    host: \"135.228.2.2\"\n    gateway_host: \"135.228.5.5\"\n    username: \"root\"\n    gateway_username: \"groot\"\n    password: \"password\"\n"
+		]
+	},
+	"std.test_dict": {
+		"scope": "yaml",
+		"prefix": "std.test_dict",
+		"description": "Test Dict",
+		"body": [
+			"testDict:\n  action: std.test_dict\n  input:\n    size: 2\n    key_prefix: key\n    val: val\n"
+		]
+	},
+	"yang.compare": {
+		"scope": "yaml",
+		"prefix": "yang.compare",
+		"description": "compare data instances",
+		"body": [
+			"compare:\n  action: yang.compare\n  input:\n    before:\n      system:\n        name: pe1\n      service:\n        vprn:\n          - service-id: 100\n            service-name: basic\n          - service-id: 200\n            service-name: business\n    after:\n      system:\n        location: Tokio\n      service:\n        vprn:\n          - service-id: 100\n            service-name: basic\n          - service-id: 200\n            service-name: business2\n    yangOptions:\n      folder: /mnt/yang\n      modules: nokia-conf\n      prefix: /nokia-conf:configure\n    fmt: json\n"
+		]
+	},
+	"yang.convert": {
+		"scope": "yaml",
+		"prefix": "yang.convert",
+		"description": "Convert dict to xml string",
+		"body": [
+			"dict2xml:\n  action: yang.convert\n  input:\n    data:\n      system:\n        name: bngMEL001\n        location: Melbourne\n      service:\n        customer:\n          - customer-name: default\n            customer-id: 1\n        vprn:\n          - service-name: business123\n            customer: default\n    fmt: xml\n    yangOptions: \n      folder: /mnt/yang\n      modules: nokia-conf\n      prefix: /nokia-conf:configure\n"
+		]
+	}
+}
