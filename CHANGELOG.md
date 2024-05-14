@@ -63,3 +63,16 @@ Updates:
 * VsCode extension will only allow you to add/update/rename files with their correct extension.
     - .action for actions
     - .yaml for workflows
+
+## [1.1.4]
+
+Updates:
+* Added support for jinja2 templates for the NSP WFM in the extension.
+* Users can Create/Update/Delete/Rename templates. 
+* Added File Extensions to jinja template files ".jinja".
+* Template files are downladed to the local filesystem with the file extension/type included.
+* Api call for GET/PUT/UPDATE are parsed so that unecessary metadata is not included in the jinja template file. Only the jinja template (Jinja Code), is what can be modified/read in the file.
+* Error Checking: VsCode extension will only allow you to add/update/rename files using their correct respective extension.
+    - .action for actions
+    - .yaml for workflows
+    - .jinja for templates
