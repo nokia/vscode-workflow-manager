@@ -46,7 +46,7 @@ To compile and generate the VSIX for installation, run:
 npm run compile
 ```
 
-2. To run and open the live instance of the extension, open the VsCode Debugger.
+2. To run and open the live instance of the extension, open the VsCode Debugger and make sure you have extension.ts open in the VsCode editor.
     - ctrl+shift+p > Debug: Start Debugging >  VsCode Extension Development
 
 3. After changes are made to the source code you  must recompile the extension in step 1. and then you must restart the extension devlopment host to reflect the changes:

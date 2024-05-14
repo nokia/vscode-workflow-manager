@@ -406,8 +406,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Template deletion failed! Reason: '+response.statusText);
 		}
-		vscode.window.showInformationMessage('Success: Template deleted');
-		vscode.window.showWarningMessage('Template Deleted!');
+		vscode.window.showWarningMessage('Success: Template Deleted!');
 		delete this.templates[name]; // update workflow cache
 	}
 
@@ -740,8 +739,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Workflow deletion failed! Reason: '+response.statusText);
 		}
-		vscode.window.showInformationMessage('Success: Workflow deleted');
-
+		vscode.window.showWarningMessage('Success: Workflow Deleted!');
 		// update workflow cache
 		delete this.workflows[name];
 	}
@@ -1009,14 +1007,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Action deletion failed! Reason: '+response.statusText);
 		}
-		vscode.window.showInformationMessage('Success: Action deleted');
-
-		// update action cache
-		delete this.actions[name];
+		vscode.window.showWarningMessage('Success: Action Deleted!');
+		delete this.actions[name]; // update action cache
 	}
 
 	private async _validateAction(data: string): Promise<void> {
 
+		console.log('executing _validateAction()');
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
@@ -1025,7 +1022,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
         }
 
 		// validate action definition
-
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/validate';
 		let response: any = await this._callNSP(url, {
 			method: 'POST',
