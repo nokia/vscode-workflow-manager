@@ -270,24 +270,20 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 		// update the templates cache
 		let json = await response.json();
-		console.log('update json: ', json);
 		const entry =  json.response.data; // access the data attribute from the json
-		console.log('entry: ', entry);
 		let defname = entry.name + '.jinja';
-		console.log('defName: ', defname);
-		console.log('name: ', name);
 
 		if (name !== defname) {
 			vscode.window.showWarningMessage('Template renamed');
-			delete this.workflows[name];
+			delete this.templates[name];
 			const ctime = Date.parse(entry.created_at);
 			const mtime = Date.parse(entry.updated_at);
-			this.workflows[defname] = new FileStat(id, ctime, mtime, data.length, false);	
+			this.templates[defname] = new FileStat(id, ctime, mtime, data.length, false);	
 			this.readDirectory(vscode.Uri.parse("wfm:/templates"));
 		} else {
-			this.workflows[name].ctime = Date.parse(entry.created_at);
-			this.workflows[name].mtime = Date.parse(entry.updated_at);
-			this.workflows[name].size  = data.length;	
+			this.templates[name].ctime = Date.parse(entry.created_at);
+			this.templates[name].mtime = Date.parse(entry.updated_at);
+			this.templates[name].size  = data.length;	
 		}
 
 		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
@@ -402,7 +398,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				'Authorization': 'Bearer ' + token
 			}
 		});
-		if (!response){
+		if (!response) {
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
@@ -411,6 +407,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			throw vscode.FileSystemError.Unavailable('Template deletion failed! Reason: '+response.statusText);
 		}
 		vscode.window.showInformationMessage('Success: Template deleted');
+		vscode.window.showWarningMessage('Template Deleted!');
 		delete this.templates[name]; // update workflow cache
 	}
 
