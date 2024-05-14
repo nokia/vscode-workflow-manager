@@ -179,6 +179,7 @@
                     "markdownDescription": "Name of the action associated with the task. Can be a static value or an expression. *Mutually exclusive with `workflow`. If neither `action` nor `workflow` are provided, then the action `std.noop` will be used that does nothing.",
                     "type": "string",
                     "enum": [
+                        "aaa_test",
                         "file.chksumMD5",
                         "file.chksumSHA256",
                         "file.read",
@@ -430,6 +431,17 @@
             },
             "additionalProperties": false,
             "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "aaa_test"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/aaa_test"}
+                        },
+                        "title": "aaa_test",                
+                        "markdownDescription": "No description provided"
+                    }
+                },
                 {
                     "if": {"properties": {"action": {"const": "file.chksumMD5"}},
                             "required":["action"]},
@@ -1115,6 +1127,20 @@
            ]
         },
         "action-input": {
+            "aaa_test": {
+                "title": "aaa_test",
+                "markdownDescription": "No description provided",
+                "type": "object",
+                "properties": {
+                    "token_auth": {
+                        "title": "token_auth"
+                    },
+                    "formValues": {
+                        "title": "formValues"
+                    }
+                },
+                "additionalProperties": false
+            },
             "file.chksumMD5": {
                 "title": "file.chksumMD5",
                 "markdownDescription": "calculate MD5 checksum",

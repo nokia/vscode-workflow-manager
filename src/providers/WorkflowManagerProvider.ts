@@ -262,8 +262,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 
 		console.log("PUT", url, response.status);
-		console.log('response: ', response);
-		console.log('response statusText: ', response.statusText);	
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Template upload failed! Reason: '+response.statusText);
 		}
@@ -273,25 +271,24 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		// update the templates cache
 		let json = await response.json();
 		console.log('update json: ', json);
-		const entry =  json.response.data; 
+		const entry =  json.response.data; // access the data attribute from the json
+		console.log('entry: ', entry);
+		let defname = entry.name + '.jinja';
+		console.log('defName: ', defname);
+		console.log('name: ', name);
 
-		this.templates[name].ctime = Date.parse(entry.created_at);
-		this.templates[name].mtime = Date.parse(entry.updated_at);
-		this.templates[name].size  = data.length;
-
-		// if (name !== defname) {
-		// 	// vscode.window.showWarningMessage('Workflow renamed');
-		// 	// delete this.workflows[name];
-		// 	// const ctime = Date.parse(entry.created_at);
-		// 	// const mtime = Date.parse(entry.updated_at);
-		// 	// this.workflows[defname] = new FileStat(id, ctime, mtime, data.length, false);
-		// 	// console.log('defName in workflows', defname);	
-		// 	// this.readDirectory(vscode.Uri.parse("wfm:/workflows"));
-		// } else {
-			// this.workflows[name].ctime = Date.parse(entry.created_at);
-			// this.workflows[name].mtime = Date.parse(entry.updated_at);
-			// this.workflows[name].size  = data.length;	
-		// }
+		if (name !== defname) {
+			vscode.window.showWarningMessage('Template renamed');
+			delete this.workflows[name];
+			const ctime = Date.parse(entry.created_at);
+			const mtime = Date.parse(entry.updated_at);
+			this.workflows[defname] = new FileStat(id, ctime, mtime, data.length, false);	
+			this.readDirectory(vscode.Uri.parse("wfm:/templates"));
+		} else {
+			this.workflows[name].ctime = Date.parse(entry.created_at);
+			this.workflows[name].mtime = Date.parse(entry.updated_at);
+			this.workflows[name].size  = data.length;	
+		}
 
 		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
 
@@ -396,7 +393,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
 		}
 
-		// delete template
+		// API call to delete template
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/jinja-template/'+id.replace('.jinja', '');
 		let response: any = await this._callNSP(url, {
 			method: 'DELETE',
@@ -414,9 +411,45 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			throw vscode.FileSystemError.Unavailable('Template deletion failed! Reason: '+response.statusText);
 		}
 		vscode.window.showInformationMessage('Success: Template deleted');
+		delete this.templates[name]; // update workflow cache
+	}
 
-		// update workflow cache
-		delete this.templates[name];
+	private async _renameTemplate(oldName: string, newName: string): Promise<void> {
+		console.log('executing renameTemplate()');
+
+		let id = this.templates[oldName].id;
+		let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/jinja-template/"+id+"/definition";
+
+		await this._getAuthToken(); // get auth-token
+		const token = await this.authToken;
+		if (!token) {
+			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+		}
+
+		let response: any = await this._callNSP(url, { // get workflow / action definition
+			method: 'GET',
+			headers: {
+				'Cache-Control': 'no-cache',
+				'Authorization': 'Bearer ' + token
+			}
+		});
+
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
+
+		console.log("GET", url, response.status);
+		if (!response.ok) {
+			console.log(response);
+			throw vscode.FileSystemError.FileNotFound('Template not found');
+		}
+
+		let text = await response.text();
+		const yaml = require('yaml');
+		const doc = yaml.parse(text);
+		doc.name = newName.replace('.jinja', ''); // update the template attribute
+		console.log('doc: ', doc);
+		await this._updateTemplate(oldName, yaml.stringify(doc));
 	}
 
 	// --- private methods: WFM workflows
@@ -1078,7 +1111,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	// --- private methods: WFM executions
-
 	private async _getWebviewContent(wfnm: string,exectime: string,execstat: string,execid: string,state_info: string,panel: vscode.WebviewPanel): Promise<string> {
 		let path = require('path');
 
@@ -1707,10 +1739,18 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		} else if (oldUri.toString().startsWith('wfm:/actions/') && newUri.toString().startsWith('wfm:/actions/')) {
 			const oldName : string = oldUri.toString().substring(13);
 			const newName : string = newUri.toString().substring(13);
-			if (!newName.endsWith('.yaml')) { // if the newName does not end with .yaml throw a vscode error and return
+			if (!newName.endsWith('.action')) { // if the newName does not end with .yaml throw a vscode error and return
 				throw vscode.FileSystemError.NoPermissions('Action filename must end with .action');
 			} else {
 				await this._renameAction(oldName, newName);
+			}
+		} else if (oldUri.toString().startsWith('wfm:/templates/') && newUri.toString().startsWith('wfm:/templates/')) {
+			const oldName : string = oldUri.toString().substring(15);
+			const newName : string = newUri.toString().substring(15);
+			if (!newName.endsWith('.jinja')) { // if the newName does not end with .yaml throw a vscode error and return
+				throw vscode.FileSystemError.NoPermissions('Template filename must end with .jinja');
+			} else {
+				await this._renameTemplate(oldName, newName);
 			}
 		} else {
 			throw vscode.FileSystemError.NoPermissions('Unsupported operation!');
