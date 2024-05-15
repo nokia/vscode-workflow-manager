@@ -837,8 +837,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			throw vscode.FileSystemError.Unavailable('Workflow deletion failed! Reason: '+response.statusText);
 		}
 		vscode.window.showWarningMessage('Success: Workflow Deleted!');
-		// update workflow cache
+		// update workflow cache: When a workflow is deleted its documentation is also deleted
 		delete this.workflows[name];
+		delete this.workflow_documentations[name.replace('.yaml', '.md')];
 	}
 
 	// _validateWorkflow: Validates a workflow by calling the NSP and checking if the workflow is valid
