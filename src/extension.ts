@@ -15,7 +15,6 @@ import { WorkflowManagerProvider, CodelensProvider } from './providers';
 
 // This function is ran once the the extension is activated:
 export function activate(context: vscode.ExtensionContext) {  
-	console.log('Workflow Manager says "Hello"');
 
 	const secretStorage: vscode.SecretStorage = context.secrets;
 	const config = vscode.workspace.getConfiguration('workflowManager');
@@ -27,16 +26,11 @@ export function activate(context: vscode.ExtensionContext) {
 	const localpath : string = config.get("localStorage.folder") ?? "";
 	const fileIgnore : Array<string> = config.get("ignoreTags") ?? [];
 
-	console.log("Ignore labels:");
-	console.log(fileIgnore);
-	console.log(localpath);
-	console.log(localsave);
 	const wfmProvider = new WorkflowManagerProvider(server, username, secretStorage, port, localsave, localpath, timeout, fileIgnore);
 	context.subscriptions.push(vscode.workspace.registerFileSystemProvider('wfm', wfmProvider, { isCaseSensitive: true }));
 	context.subscriptions.push(vscode.window.registerFileDecorationProvider(wfmProvider));
 	wfmProvider.extContext=context;
 	console.log("Workflow Manager Provider registered");
-	console.log(wfmProvider);
 	
 	const header = new CodelensProvider(server); 
 	context.subscriptions.push(vscode.languages.registerCodeLensProvider({language: 'yaml', scheme: 'wfm'}, header));
