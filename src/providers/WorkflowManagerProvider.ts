@@ -15,8 +15,14 @@ export class FileStat implements vscode.FileStat { // FileStat is a class that c
     size: number;
 	signed: boolean;
 
-	constructor (id: string, ctime: number, mtime: number, size:number, signed:boolean) {
-		this.type = vscode.FileType.File;
+	constructor (id: string, fileType: string, ctime: number, mtime: number, size:number, signed:boolean) {
+		if (fileType === 'file') {
+			this.type = vscode.FileType.File;
+		}
+		if (fileType === 'directory') {
+			this.type = vscode.FileType.Directory;
+			
+		}
 		this.ctime = Date.now();
 		this.mtime = Date.now();
 		this.size = 0;
@@ -52,10 +58,11 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	secretStorage: vscode.SecretStorage;
 	extContext: vscode.ExtensionContext;
 	actions: {[name: string]: FileStat}; // DS for actions
-	workflows: {[name: string]: FileStat}; // DS for workflows
 	templates: {[name: string]: FileStat}; // DS for templates
+	workflows: {[name: string]: FileStat}; // DS for workflows
 	workflow_documentations: {[name: string]: FileStat}; // DS for workflow_documentations
 	workflow_views: {[name: string]: FileStat}; // DS for workflow_views
+	workflow_folders: {[name: string]: FileStat}; // DS for workflow_folders
 
 	public onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[] | undefined>;
     private _eventEmiter: vscode.EventEmitter<vscode.Uri | vscode.Uri[]>;
@@ -78,6 +85,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.templates = {};
 		this.workflow_documentations = {};
 		this.workflow_views = {};
+		this.workflow_folders = {};
 
 		// used for FileDecorator        
 		this._eventEmiter = new vscode.EventEmitter(); // Event emitter for file decorations
@@ -367,7 +375,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			throw vscode.FileSystemError.Unavailable('Template upload failed! Reason: '+response.statusText);
 		}
 		vscode.window.showInformationMessage('Success: Template uploaded to NSP');
-		console.log('response: ', response);
 
 		// update the templates cache
 		let json = await response.json();
@@ -379,7 +386,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			delete this.templates[name];
 			const ctime = Date.parse(entry.created_at);
 			const mtime = Date.parse(entry.updated_at);
-			this.templates[defname] = new FileStat(id, ctime, mtime, data.length, false);	
+			this.templates[defname] = new FileStat(id, 'file', ctime, mtime, data.length, false);	
 			this.readDirectory(vscode.Uri.parse("wfm:/templates"));
 		} else {
 			this.templates[name].ctime = Date.parse(entry.created_at);
@@ -472,7 +479,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const id = entry.id;
 		const ctime = Date.parse(entry.created_at);
 		const mtime = Date.parse(entry.updated_at);
-		this.templates[name] = new FileStat(id, ctime, mtime, data.length, false);
+		this.templates[name] = new FileStat(id, 'file', ctime, mtime, data.length, false);
 
 		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
 		vscode.window.showInformationMessage('Success: Template published');
@@ -615,7 +622,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const id = entry.id;
 		const ctime = Date.parse(entry.created_at);
 		const mtime = Date.parse(entry.updated_at);
-		this.workflows[name] = new FileStat(id, ctime, mtime, data.length, false);
+		this.workflows[name] = new FileStat(id, 'file', ctime, mtime, data.length, false);
 
 		// change to PUBLISHED
 		url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/status';
@@ -744,7 +751,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				delete this.workflows[name];
 				const ctime = Date.parse(entry.created_at);
 				const mtime = Date.parse(entry.updated_at);
-				this.workflows[defname] = new FileStat(id, ctime, mtime, data.length, false);
+				this.workflows[defname] = new FileStat(id, 'file', ctime, mtime, data.length, false);
 				console.log('defName in workflows', defname);	
 				this.readDirectory(vscode.Uri.parse("wfm:/workflows"));
 			} else {
@@ -848,6 +855,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		delete this.workflows[name];
 		delete this.workflow_documentations[name.replace('.yaml', '.md')];
 		delete this.workflow_views[name.replace('.yaml', '.json')];
+		delete this.workflow_folders[name.replace('.yaml', '')];
 	}
 
 	// _validateWorkflow: Validates a workflow by calling the NSP and checking if the workflow is valid
@@ -1010,7 +1018,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const id = entry.id;
 		const ctime = Date.parse(entry.created_at);
 		const mtime = Date.parse(entry.updated_at);
-		this.actions[name] = new FileStat(id, ctime, mtime, data.length, false);
+		this.actions[name] = new FileStat(id, 'file', ctime, mtime, data.length, false);
 
 		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
 	}
@@ -1082,7 +1090,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			name = entry.name + '.action';
 			const ctime = Date.parse(entry.created_at);
 			const mtime = Date.parse(entry.updated_at);
-			this.actions[name] = new FileStat(id, ctime, mtime, data.length, false);			
+			this.actions[name] = new FileStat(id, 'file', ctime, mtime, data.length, false);			
 		} else {
 			this.actions[name].ctime = Date.parse(entry.created_at);
 			this.actions[name].mtime = Date.parse(entry.updated_at);
@@ -1688,32 +1696,36 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 		const json = await response.json();
 		if (uri.toString() === "wfm:/workflows") {
-			this.workflows = (json?.response.data ?? []).reduce((workflows: any, entry: any) =>
-				(workflows[entry.name + '.yaml'] = new FileStat(entry.id, Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.details.signature === "SIGNED"), workflows), {}
-			);
+			this.workflow_folders = (json?.response.data ?? []).reduce((workflow_folders: any, entry: any) =>
+				(workflow_folders[entry.name] = new FileStat(entry.id, 'directory', Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.details.signature === "SIGNED"), workflow_folders), {}
+			);	
 		} else if (uri.toString() === "wfm:/actions") {
 			this.actions = (json?.response.data ?? []).reduce((actions: any, entry: any) =>
-				(actions[entry.name + '.action'] = new FileStat(entry.id, Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.actionDetail.signature === "SIGNED"), actions), {}
+				(actions[entry.name + '.action'] = new FileStat(entry.id, 'file', Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.actionDetail.signature === "SIGNED"), actions), {}
 			);
 		} else if (uri.toString() === "wfm:/templates") { 
 			this.templates = (json?.response.data ?? []).reduce((templates: any, entry: any) =>
-				(templates[entry.name + '.jinja'] = new FileStat(entry.id, Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.signature === "SIGNED"), templates), {}
+				(templates[entry.name + '.jinja'] = new FileStat(entry.id, 'file', Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.signature === "SIGNED"), templates), {}
 			);
 		} else if (uri.toString() === "wfm:/workflow_documentation") {
 			this.workflow_documentations = (json?.response.data ?? []).reduce((workflow_documentations: any, entry: any) =>
-				(workflow_documentations[entry.name + '.md'] = new FileStat(entry.id, Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.details.signature === "SIGNED"), workflow_documentations), {}
+				(workflow_documentations[entry.name + '.md'] = new FileStat(entry.id, 'file', Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.details.signature === "SIGNED"), workflow_documentations), {}
 			);
 		} else if (uri.toString().startsWith("wfm:/workflows/")) { // If we are opening up a workflow folder inside of the workflows folder
 			this.workflows = (json?.response.data ?? []).reduce((workflows: any, entry: any) =>
-				(workflows[entry.name + '.yaml'] = new FileStat(entry.id, Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.details.signature === "SIGNED"), workflows), {}
+				(workflows[entry.name + '.yaml'] = new FileStat(entry.id, 'file', Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.details.signature === "SIGNED"), workflows), {}
 			);
 			this.workflow_documentations = (json?.response.data ?? []).reduce((workflow_documentations: any, entry: any) =>
-				(workflow_documentations[entry.name + '.md'] = new FileStat(entry.id, Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.details.signature === "SIGNED"), workflow_documentations), {}
+				(workflow_documentations[entry.name + '.md'] = new FileStat(entry.id, 'file', Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.details.signature === "SIGNED"), workflow_documentations), {}
 			);
 			this.workflow_views = (json?.response.data ?? []).reduce((workflow_views: any, entry: any) => 
-				(workflow_views[entry.name + '.json'] = new FileStat(entry.id, Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.details.signature === "SIGNED"), workflow_views), {}
+				(workflow_views[entry.name + '.json'] = new FileStat(entry.id, 'file', Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.details.signature === "SIGNED"), workflow_views), {}
+			);
+			this.workflow_folders = (json?.response.data ?? []).reduce((workflow_folders: any, entry: any) =>
+				(workflow_folders[entry.name] = new FileStat(entry.id, 'directory', Date.parse(entry.created_at), Date.parse(entry.updated_at), 0, entry.details.signature === "SIGNED"), workflow_folders), {}
 			);
 		}
+
 		console.log('completed filestat');
 		let filteredList = json?.response.data; // get the list of workflows or actions or templates
 		if (uri.toString() === "wfm:/workflows" ) {
@@ -1724,8 +1736,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				}
 			}
 			filteredList = json?.response.data.filter(checkLabels.bind(this,this.fileIgnore));
-			return (filteredList ?? []).map(entry  => [entry.name, vscode.FileType.Directory] as [string, vscode.FileType.Directory]);
-			// var result: [string, vscode.FileType][] = (filteredList ?? []).map(entry  => [entry.name + '.yaml', vscode.FileType.File] as [string, vscode.FileType]);
+			return (filteredList ?? []).map(entry  => [entry.name, vscode.FileType.Directory] as [string, vscode.FileType.Directory]); // returns the workflow folders.
 		} else if (uri.toString() === "wfm:/actions") {
 			var result: [string, vscode.FileType][] = (filteredList ?? []).map(entry => [entry.name + '.action', vscode.FileType.File] as [string, vscode.FileType]);			
 		} else if (uri.toString() === "wfm:/templates") {
@@ -1741,11 +1752,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			filteredList = json?.response.data.filter(checkLabels.bind(this,this.fileIgnore));
 			var result: [string, vscode.FileType][] = (filteredList ?? []).map(entry  => [entry.name + '.md', vscode.FileType.File] as [string, vscode.FileType]);
 			console.log('templates[result]: ', this.templates['randint.jinja']);
-		} else if (uri.toString().startsWith("wfm:/workflows/")) {
+		} else if (uri.toString().startsWith("wfm:/workflows/")) { // returns a workflow folder
 			console.log('should be here');
 			let curr_workflow_name = uri.toString().substring(15);
-			console.log('curr_workflow_name: ', curr_workflow_name);
-			console.log('workflows[curr_workflow_name]: ', this.workflows[curr_workflow_name]);
 			var result: [string, vscode.FileType][] = [[curr_workflow_name + '.yaml', vscode.FileType.File], [curr_workflow_name + '.json', vscode.FileType.File], ['README.md', vscode.FileType.File]];
 		}
 		return result;
@@ -1765,12 +1774,16 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			};
 		}
 		if (uri.toString().startsWith('wfm:/workflows/') && !uri.toString().includes('.')) {
-			return {
-				type: vscode.FileType.Directory,
-				ctime: 0,
-				mtime: Date.now(),
-				size: 0,
+			if (Object.keys(this.workflow_folders).length === 0) { // if the workflows are empty
+				console.log(vscode.Uri.parse('wfm:/workflows'))
+				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
 			}
+			const key = uri.toString().split('/')[2];
+			console.log('key: ', key);
+			if (key in this.workflow_folders) {
+				return this.workflow_folders[key];
+			}
+			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
 		} else if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().endsWith('.yaml')) {
 			if (Object.keys(this.workflows).length === 0) { // if the workflows are empty
 				console.log(vscode.Uri.parse('wfm:/workflows'))
@@ -1781,8 +1794,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			if (key in this.workflows) {
 				console.log(this.workflows[key]);
 				return this.workflows[key];
-			} else { // if its not in the workflows
-				await this.writeFile(vscode.Uri.parse('wfm:/workflows/'+key+'/'+key), new Uint8Array(Buffer.from('')), { create: true, overwrite: true });
 			}
 			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
 		} else if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().endsWith('.md')) {
@@ -1796,7 +1807,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				return this.workflow_documentations[key];
 			}
 			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
-
 		} else if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().endsWith('.json')) {
 			if (Object.keys(this.workflows).length === 0) {
 				console.log(vscode.Uri.parse('wfm:/workflows'))
@@ -1898,7 +1908,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			throw vscode.FileSystemError.FileNotFound(uri);
 		}
 
-		console.log('response: ', response);
 		let text = await response.text();
 		if (uri.toString().startsWith("wfm:/templates/")) { // if we are in the templates directory
 			console.log('URI: wfm:/templates');
@@ -1925,7 +1934,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	// writeFile function: writes the file content to the file and updates the file stat
 	async writeFile(uri: vscode.Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): Promise<void> {
-		console.log('executing writeFile()');
+		console.log("executing writeFile("+uri+")");
 		let url = undefined;
 		if (uri.toString().startsWith('wfm:/workflows/')) {
 			if (uri.toString().endsWith('.json')) { // if its a view
@@ -1960,6 +1969,10 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	async rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { overwrite: boolean }): Promise<void> {
 		console.log("executing rename("+oldUri+", "+newUri+")");
+		if (oldUri.toString().startsWith('wfm:/workflows/') && newUri.toString().includes('.')) {
+			let uri_folder_name = oldUri.toString().split("/").pop().split(".")[0];
+			throw vscode.FileSystemError.NoPermissions('Must rename the '+uri_folder_name+' workflow folder!');
+		}
 		if (oldUri.toString().startsWith('wfm:/workflows/') && newUri.toString().startsWith('wfm:/workflows/')) {
 			const oldName : string = oldUri.toString().substring(15);
 			const newName : string = newUri.toString().substring(15);
@@ -2007,7 +2020,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			await this._deleteWorkflow(key);
 		} else if (uri.toString().startsWith("wfm:/workflows/") && uri.toString().includes('.')) {
 			let folder_name = uri.toString().split("/").pop().split(".")[0];
-			throw vscode.FileSystemError.NoPermissions('Permission denied! Must delete the '+folder_name+' folder');
+			throw vscode.FileSystemError.NoPermissions('Permission denied! Must delete the '+folder_name+' workflow folder!');
 		} else if (uri.toString().startsWith("wfm:/actions/")) {
 			let key = uri.toString().substring(13);
 			await this._deleteAction(key);
@@ -2022,7 +2035,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	createDirectory(uri: vscode.Uri): void {
-		console.log("executing createDirectory("+uri+")");
 		throw vscode.FileSystemError.NoPermissions('Unknown resouce!');
 	}
 
