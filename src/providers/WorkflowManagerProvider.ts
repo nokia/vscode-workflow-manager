@@ -554,8 +554,12 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	// --- private methods: WFM workflows
 	// createWorkflow: Creates a new workflow
-	private async _createWorkflow(data: string): Promise<void> {
+	private async _createWorkflow(temp_name: string, data: string): Promise<void> {
+		
 		console.log('executing createWorkflow()');
+
+		// make a temp folder so VsCode doese't throw up an error in that the folder doesen't exist when created
+		this.workflow_folders[temp_name.replace('.yaml', '')] = new FileStat('', 'directory', 0, 0, data.length, false);
 
 		await this._getAuthToken(); // get auth-token
 		const token = await this.authToken;
@@ -618,10 +622,10 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const id = entry.id;
 		const ctime = Date.parse(entry.created_at);
 		const mtime = Date.parse(entry.updated_at);
+		this.workflow_folders[name.replace('.yaml', '')] = new FileStat(id, 'directory', ctime, mtime, data.length, false);
 		this.workflows[name] = new FileStat(id, 'file', ctime, mtime, data.length, false);
-		this.workflow_documentations[name] = new FileStat(id, 'file', ctime, mtime, data.length, false);
-		this.workflow_views[name] = new FileStat(id, 'file', ctime, mtime, data.length, false);	
-		this.workflow_folders[name] = new FileStat(id, 'directory', ctime, mtime, data.length, false);
+		this.workflow_documentations[name.replace('.yaml', '.md')] = new FileStat(id, 'file', ctime, mtime, data.length, false);
+		this.workflow_views[name.replace('.yaml', '.json')] = new FileStat(id, 'file', ctime, mtime, data.length, false);	
 
 		// change to PUBLISHED
 		url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/status';
@@ -641,10 +645,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Change mode to PUBLISHED failed! Reason: '+response.statusText);
 		}
-		// how to x out the current live editor and open the new one
-		vscode.commands.executeCommand("workbench.action.closeActiveEditor");
 		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
 		vscode.window.showInformationMessage('Success: Workflow published');
+		console.log("completed createWorkflow()");
 	}
 
 	// updateWorkflow: Updates an existing workflow
@@ -657,7 +660,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if ((defname !== name) && (!rename)) { // If the name in the definition is different from the filename and not a rename
 			if (Object.keys(this.workflows).indexOf(defname)=== -1) { // if the  name is not in the workflows
 				vscode.window.showInformationMessage('Workflow Name changed, creating new workflow.');
-				await this._createWorkflow(data);
+				await this._createWorkflow(defname, data);
 				let txtdoc = await vscode.workspace.openTextDocument( vscode.Uri.parse("wfm:/workflows/" + defname.replace('.yaml','') + "/" +defname));
 				vscode.window.showTextDocument(txtdoc);
 			} else {
@@ -762,8 +765,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				this.workflows[defname] = new FileStat(id, 'file', ctime, mtime, data.length, false);
 				console.log('defName in workflows', defname);	
 				this.readDirectory(vscode.Uri.parse("wfm:/workflows/"));
-			} else {
-				// here we update the workflow cache
+			} else { // here we update the workflow cache
 				console.log("here::::");
 				this.workflows[name].ctime = Date.parse(entry.created_at);
 				this.workflows[name].mtime = Date.parse(entry.updated_at);
@@ -1012,7 +1014,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				if (data.length === 0) {
 					data = "---\nversion: '2.0'\n\n"+name.replace('.yaml', '')+":\n  type: direct\n\n  description: this is a new workflow\n  \n  tags:\n    - demo\n\n  input:\n    - number1: 1234\n    - number2: 123\n    - ipAddress: '127.0.0.1'\n    - someText: 'my default value'\n    - pass: false\n    - delay: 1\n    - passRatio: 30\n\n  output:\n    devices: <% $.nodeList %>\n    sysinfo: <% $.sysInfo %>\n    rttinfo: <% $.rttInfo %>\n    time: <% $.timeInfo %>\n    \n  output-on-error:\n    result: 'Error occured, check logs for details'\n\n  tasks:\n    task1:\n      action: std.echo\n      input:\n        output:\n          someMath: <% $.number1 - $.number2 %>\n      publish:\n        randomNbr: <% 100*random() %>\n      on-success:\n        - pingLocalHost\n\n    pingLocalHost:\n      action: nsp.ping\n      input:\n        host: 127.0.0.1\n        duration: 1\n      publish:\n        rttInfo: <% task().result.RTT %>\n      on-success:\n        - getPythonVersionAndModules\n        - getTimestamp\n        - getNodes\n      on-error:\n        - fail\n\n    getNodes:\n      action: nsp.https\n      input:\n        url: 'https://restconf-gateway/restconf/operations/nsp-inventory:find'\n        method: POST\n        body: \n          input:\n            xpath-filter: /nsp-equipment:network/network-element\n            offset: 0\n            limit: 100\n            fields: ne-id;ne-name;ip-address;version;location;type;product\n            sort-by:\n              - ne-name\n      publish:\n        nodeList: <% task().result.content['nsp-inventory:output'] %>\n      on-complete:\n        - continue\n\n    getPythonVersionAndModules:\n      action: nsp.python\n      input:\n        context: <% $ %>\n        script: |\n          import sys\n          import platform\n          import pkg_resources\n\n          rvalue = {}\n          rvalue['sys.version']=sys.version\n          rvalue['platform.python_version']=platform.python_version()\n          rvalue['packages'] = sorted(['%s==%s' % (i.key, i.version) for i in pkg_resources.working_set])\n\n          return rvalue\n      publish:\n        sysInfo: <% task().result %>\n      on-complete:\n        - continue\n\n    getTimestamp:\n      action: std.js\n      input:\n        script: |\n          function getTS() {\n            const date = new Date();\n            let now = date.getTime();\n            return now;\n          }\n          return getTS();\n      publish:\n        timeInfo: <% task().result %>\n      on-complete:\n        - continue\n        \n    continue:\n      join: all    \n      action: std.noop\n      on-success:\n        - randomFailure: <% not $.pass %>\n        - done: <% $.pass %>\n        \n    randomFailure:\n      action: nsp.assert\n      input:\n        input: <% $.randomNbr < $.passRatio %>\n        expected: true\n        shouldFail: true\n      publish:\n        result: 'I am happy'\n      publish-on-error:\n        result: 'I am unhappy'\n      on-error:\n        - handleFailure\n      on-success:\n        - done\n\n    handleFailure:\n      action: std.sleep\n      input:\n        seconds: <% $.delay %>\n      on-success:\n        - done\n\n    done:\n      action: std.noop\n";
 				}
-				await this._createWorkflow(data);
+				this._createWorkflow(name, data);
 			}
 		}
 	}
@@ -1859,6 +1861,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		return result;
 	}
 
+
 	// VsCode stat function: returns the file stat of the file (file metadata/information)
 	async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 		console.log('executing stat('+uri+')');
@@ -1871,25 +1874,12 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				permissions: vscode.FilePermission.Readonly
 			};
 		}
-		// when renaming a file within a workflow.yaml definition VsCode tries to open the file with the wrong uri due to the folder structure
-		if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().split("/")[2].includes('.')) {
-			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
-			console.log('uri: ', uri.toString());
-			console.log('here1');
-			let file_name = uri.toString().split("/")[2];
-			let correct_uri = uri.toString().split(".")[0] +"/"+ file_name;
-			console.log('correct_uri: ', correct_uri);
-			uri = vscode.Uri.parse(correct_uri);
-		}
 		if (uri.toString().startsWith('wfm:/workflows/') && !uri.toString().includes('.')) {
 			if (Object.keys(this.workflow_folders).length === 0) { // if the workflows are empty
 				console.log(vscode.Uri.parse('wfm:/workflows'))
 				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
 			}
 			const key = uri.toString().split('/')[2];
-			console.log('key: ', key);
-			console.log('workflow_folders: ', this.workflow_folders);
-			console.log('workflows: ' , this.workflows);
 			if (key in this.workflow_folders) {
 				return this.workflow_folders[key];
 			}
@@ -1919,7 +1909,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				console.log('returning: ', this.workflow_documentations[key])
 				return this.workflow_documentations[key];
 			}
-			console.log('throwing error');
 			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
 		} else if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().endsWith('.json')) {
 			if (Object.keys(this.workflows).length === 0) {
@@ -1940,10 +1929,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 			const key = uri.toString().substring(13); // get the key of the action
 			if (key in this.actions) {
-				console.log('1');
 				return this.actions[key];
 			}
-			console.log('2');
 			throw vscode.FileSystemError.FileNotFound('Unknown action!');
 		} else if(uri.toString().startsWith('wfm:/templates/')) {
 			if (Object.keys(this.templates).length === 0) {
@@ -1952,43 +1939,15 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 			const key = uri.toString().substring(15); // get the key of the action
 			if (key in this.templates) {
-				console.log('1');
 				return this.templates[key];
 			}
-			console.log('2');
 			throw vscode.FileSystemError.FileNotFound('Unknown template!');
 		}
 		throw vscode.FileSystemError.FileNotFound('Unknown resouce!');
 	}
 
-	async FileNotFound(uri: vscode.Uri): Promise<void> {
-		console.log('executing FileNotFound('+uri.toString()+')');
-		throw vscode.FileSystemError.FileNotFound('Unknown resouce!');
-	}
-
-	async fileExists(uri: vscode.Uri): Promise<boolean> {
-		console.log('executing fileExists('+uri.toString()+')');
-		try {
-			await vscode.workspace.fs.stat(uri);
-			return true;
-		} catch (error) {
-			if (error instanceof vscode.FileSystemError && error.code === 'FileNotFound') {
-				return false;
-			}
-			throw error;
-		}
-	}
-
 	async readFile(uri: vscode.Uri): Promise<Uint8Array> { // VsCode readFile function: returns the file content of the file
 		console.log('executing readFile('+uri.toString()+')');
-		if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().split("/")[2].includes('.')) {
-			console.log('uri: ', uri.toString());
-			console.log('here1');
-			let file_name = uri.toString().split("/")[2];
-			let correct_uri = uri.toString().split(".")[0] +"/"+ file_name;
-			console.log('correct_uri: ', correct_uri);
-			uri = vscode.Uri.parse(correct_uri);
-		}
 		let url = undefined;
 		if (uri.toString().startsWith("wfm:/actions/")) {
 			let id = uri.toString().substring(13).replace('.action', '');
@@ -2158,11 +2117,10 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		console.log("executing createDirectory("+uri+")");
 		if (uri.toString().startsWith('wfm:/workflows/')) {
 			this._writeWorkflow(uri.toString().substring(15) + '.yaml', '');
-			return;
+			console.log("BEFORE OR AFTER ERROR");
 		} else {
 			throw vscode.FileSystemError.NoPermissions('Unknown Resource!');
 		}
-		
 	}
 
 	// --- implement FileDecorationProvider
