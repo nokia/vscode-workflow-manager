@@ -1413,8 +1413,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (editor) {
 			var uri = vscode.window.activeTextEditor?.document.uri.toString(); // gets it uri
 			if (uri?.startsWith('wfm:/workflows/')) { // if the active file is in workflows
-				uri = uri.replace('.yaml', '')
-				const key = uri.toString().substring(15);
+				const key = uri.split("/").pop().replace('.yaml', '');
 				const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+key;
 				vscode.env.openExternal(vscode.Uri.parse(url));
 			} else if (uri?.startsWith('wfm:/actions/')) { // if the active file is in actions
@@ -1438,7 +1437,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					}
 				} else {
 					if (Object.keys(this.workflows).length === 0) {
-						console.log(vscode.Uri.parse('wfm:/workflows'))
 						console.log(vscode.Uri.parse('wfm:/workflows'))
 						await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
 					}		
