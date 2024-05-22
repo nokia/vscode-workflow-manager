@@ -818,9 +818,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	// deleteWorkflow: Deletes a workflow
 	private async _deleteWorkflow(name: string): Promise<void> {
 		console.log('executing deleteWorkflow()');
-		console.log('name: ', name);
+		
+		if (this.workflows[name+'.yaml'].signed) {
+			throw vscode.FileSystemError.NoPermissions('Unable to delete SIGNED workflows');
+		}
+
 		const id : string = this.workflows[name+'.yaml'].id;
-		console.log('id: ', id);
+
 		// get auth-token
 		await this._getAuthToken();
 		const token = await this.authToken;
@@ -2095,7 +2099,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			throw vscode.FileSystemError.NoPermissions('Permission denied!');
 		} else if (uri.toString().startsWith("wfm:/workflows/") && !uri.toString().includes('.')) {
 			let key = uri.toString().substring(15);
-			console.log('key: ', key)
 			await this._deleteWorkflow(key);
 		} else if (uri.toString().startsWith("wfm:/workflows/") && uri.toString().includes('.')) {
 			let folder_name = uri.toString().split("/").pop().split(".")[0];
