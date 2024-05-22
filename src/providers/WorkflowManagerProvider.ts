@@ -154,6 +154,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	// --- public methods: revoke auth-token from the NSP
 	private async _revokeAuthToken(): Promise<void> {
+		console.log('executing _revokeAuthToken()');
 		if (this.authToken) {
 			const token = await this.authToken;
 			console.log("_revokeAuthToken("+token+")");
@@ -180,6 +181,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	// --- public methods: _callNsp - > Calls the NSP so that we can interact with it
 	private async _callNSP(url:string, options:any): Promise<void>{
+		console.log('executing _callNSP(+url+)', url);
 		const fetch = require('node-fetch');
 		const timeout = new AbortController();
         setTimeout(() => timeout.abort(), this.timeout);
@@ -486,7 +488,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	// deleteWorkflow: Deletes a workflow
 	private async _deleteTemplate(name: string): Promise<void> {
-
+		console.log('executing deleteTemplate(+name+)', name);
 		const id : string = this.templates[name].id;
 
 		// get auth-token
@@ -874,7 +876,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	// _validateWorkflow: Validates a workflow by calling the NSP and checking if the workflow is valid
 	private async _validateWorkflow(data: string): Promise<void> {
-
+		console.log('executing _validateWorkflow()');
 		await this._getAuthToken(); // get auth-token
 		const token = await this.authToken;
 		if (!token) {
@@ -1113,7 +1115,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	private async _deleteAction(name: string): Promise<void> {
-
+		console.log('executing deleteAction(+name+)', name);
 		const id : string = this.actions[name].id;
 		await this._getAuthToken(); // get auth-token
 		const token = await this.authToken;
@@ -1236,6 +1238,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	// --- private methods: WFM executions
 	private async _getWebviewContent(wfnm: string,exectime: string,execstat: string,execid: string,state_info: string,panel: vscode.WebviewPanel): Promise<string> {
+		console.log('executing _getWebviewContent()');
 		let path = require('path');
 
 		const extURI = this.extContext.extensionUri;
@@ -1290,6 +1293,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	// --- public methods
 	async validate(): Promise<void> {
+
+		console.log("Executing validate()");
 		const YAML = require('yaml')
 		const editor = vscode.window.activeTextEditor;
 
@@ -1361,6 +1366,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	async applySchema(): Promise<void>{ // applySchema returns a promise of void
+		console.log("Executing applySchema()");
 		const editor = vscode.window.activeTextEditor; // get the active text editor
 		const extURI = this.extContext.extensionUri;
 		let outpath = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema.json').toString().replace("file://","");
@@ -1468,6 +1474,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	async lastResult(): Promise<void>{
+		console.log('executing lastResult()');
 		const YAML = require('yaml');
 		const fetch = require('node-fetch');
 
@@ -1825,11 +1832,17 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				console.log(vscode.Uri.parse('wfm:/workflows'))
 				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
 			}
+			if (!(uri.toString().split('/')[3] === 'README.md')) { // if user attempts to rename the workflow doc to other than README.md
+				return; // returning here will prompt the error checking in rename:
+			}
 			const key = uri.toString().split('/')[2] + '.md';
 			console.log('key: ', key);
+			console.log("workflow_documentations: ", this.workflow_documentations);
 			if (key in this.workflow_documentations) {
+				console.log('returning: ', this.workflow_documentations[key])
 				return this.workflow_documentations[key];
 			}
+			console.log('throwing error');
 			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
 		} else if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().endsWith('.json')) {
 			if (Object.keys(this.workflows).length === 0) {
@@ -1839,6 +1852,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			const key = uri.toString().split('/')[3];
 			console.log('key: ', key);
 			if (key in this.workflow_views) {
+				console.log('returning: ', this.workflow_views[key])
 				return this.workflow_views[key];
 			}
 			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
@@ -1992,6 +2006,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	async rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { overwrite: boolean }): Promise<void> {
 		console.log("executing rename("+oldUri+", "+newUri+")");
+		if (oldUri.toString().startsWith('wfm:/workflows/') && newUri.toString().includes('.md')) {
+			throw vscode.FileSystemError.NoPermissions('No Permissions!');
+		}
 		if (oldUri.toString().startsWith('wfm:/workflows/') && newUri.toString().includes('.')) {
 			let uri_folder_name = oldUri.toString().split("/").pop().split(".")[0];
 			throw vscode.FileSystemError.NoPermissions('Must rename the '+uri_folder_name+' workflow folder!');
