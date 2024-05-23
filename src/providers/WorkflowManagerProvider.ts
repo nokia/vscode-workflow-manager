@@ -8,6 +8,7 @@ import { Console, time } from 'console';
 import * as vscode from 'vscode';
 
 export class FileStat implements vscode.FileStat { // FileStat is a class that contains the file status
+
 	id: string;
     type: vscode.FileType;
     ctime: number;
@@ -76,9 +77,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.timeout = timeout;
 		this.fileIgnore = fileIgnore;
 		this.secretStorage = secretStorage;
-
-		// caching actions/workflows/templates for better performance
-		// updated whenever calling readDirectory()
+		
+		// caching actions/workflows/templates for better performance - updated whenever calling readDirectory()
 		this.actions = {};
 		this.workflows = {};
 		this.templates = {};
@@ -117,7 +117,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
                 const fetch = require('node-fetch');
                 const base64 = require('base-64');
-
                 const timeout = new AbortController();
                 setTimeout(() => timeout.abort(), this.timeout);
 
@@ -199,11 +198,10 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	// write workflow: Writes a jinja2 template to the NSP and to the local file system
 	private async _writeWorkflowDocumentation(uri: vscode.Uri, data: string): Promise<void> {
+		console.log('executing writeWorkflowDocumentation('+ uri +')');
 
-		console.log('executing writeWorkflowDocumentation()');
 		let name = uri.toString().split("/")[2] + '.md';
 		if (name.replace('.md', '.yaml') in this.workflows) { // We are modifying an existing workflow documentation (editor)
-			// make an api call to get the full template information and then update only the template attribute
 			let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow/"+name.replace('.md', '');
 			console.log('url: ', url);
 			
@@ -235,17 +233,17 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 	}
 
-	// updateWorkflow: Updates an existing workflow
+	// updateWorkflowDocumentation: Updates an existing workflow documentation
 	private async _updateWorkflowDocumentation(name: string, data: string): Promise<void> {
-		console.log('executing updateWorkflowDocumentation()');
+		console.log('executing updateWorkflowDocumentation('+name+')');
+		
 		const id = this.workflows[name].id;
-
 		await this._getAuthToken(); // get auth-token
 		const token = await this.authToken;
 		if (!token) {
 			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
 		}
-		console.log('data sent to updateWorkflowDocumentation: ', data);
+
 		// upload readme to workflow
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/readme';
 		console.log('url: ', url);
@@ -268,25 +266,15 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 		vscode.window.showInformationMessage('Success: Workflow Documentation uploaded to NSP');
 
-		// update workflow cache
+		// update workflow documentation cache
 		let json = await response.json();
-		let entry = json.response.data;
-
-		if (this.localsave===true) {
-			let fs = require("fs");
-			console.log("Saving a backup locally in the temp folder "+this.localpath);
-			let extURI = vscode.Uri.parse("file://"+this.localpath);
-			let filepath = vscode.Uri.joinPath(extURI, name).toString().replace("file://","");
-			console.log('filepath: ', filepath);
-			console.log('extURI', extURI);
-			fs.writeFile(filepath, data, (err) => {
-				if(err) {
-					console.log(err); 
-				}
-				console.log("Successfully saved in local repo."); 
-			});
-		}
-		console.log('completed updating workflow');
+		let entry = json.response.data[0];
+		this.workflow_documentations[name.replace('.yaml', '.md')].ctime = Date.parse(entry.created_at);
+		this.workflow_documentations[name.replace('.yaml', '.md')].mtime = Date.parse(entry.updated_at);
+		this.workflow_documentations[name.replace('.yaml', '.md')].size = entry.details.readme.length;
+		
+		this.saveBackupLocally(name, data);
+		console.log('completed updating workflow documentation');
 	}
 
 	// write workflow: Writes a jinja2 template to the NSP and to the local file system
@@ -330,8 +318,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				doc.template = data; // update the template attribute
 
 				await this._updateTemplate(name, yaml.stringify(doc));
-			} else {
-				// make a new template with default values
+			} else { // If we are creating a new temlplate
 				let data = "---\nname: '"+name.replace('.jinja', '')+"'\ntemplate: ''\ntags: []\ndescription: null\nversion: '1.0.0'\nprovided_by: 'admin'";
 				await this._createTemplate(data);
 			}
@@ -341,6 +328,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	// updateWorkflow: Updates an template within the VsCode Editor:
 	private async _updateTemplate(name: string, data: string): Promise<void> {
 		console.log('executing updateTemplate()');
+		
 		const yaml = require('yaml');
 		const id = this.templates[name].id; // get the template id
 
@@ -389,29 +377,14 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			this.templates[name].mtime = Date.parse(entry.updated_at);
 			this.templates[name].size  = data.length;	
 		}
-
 		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
-
-		if (this.localsave===true) {
-			let fs = require("fs");
-			console.log("Saving a backup locally in the temp folder "+this.localpath);
-			let extURI = vscode.Uri.parse("file://"+this.localpath);
-			let filepath = vscode.Uri.joinPath(extURI, name).toString().replace("file://","");
-			console.log('filepath: ', filepath);
-			console.log('extURI', extURI);
-			fs.writeFile(filepath, data, (err) => {
-				if(err) {
-					console.log(err); 
-				}
-				console.log("Successfully saved in local repo."); 
-			});
-		}
+		this.saveBackupLocally(name, data);
 		console.log('completed updating template');
-		return;
 	}
 
 	private async _createTemplate(data: string): Promise<void> {
 		console.log('executing _createTemplate()');
+
 		await this._getAuthToken(); // get auth-token
 		const token = await this.authToken;
 		if (!token) {
@@ -484,16 +457,15 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	// deleteWorkflow: Deletes a workflow
 	private async _deleteTemplate(name: string): Promise<void> {
 		console.log('executing deleteTemplate(+name+)', name);
-		const id : string = this.templates[name].id;
 
-		// get auth-token
-		await this._getAuthToken();
+		const id : string = this.templates[name].id;
+		
+		await this._getAuthToken(); // get auth-token
 		const token = await this.authToken;
 		if (!token) {
 			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
 		}
 
-		// API call to delete template
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/jinja-template/'+id.replace('.jinja', '');
 		let response: any = await this._callNSP(url, {
 			method: 'DELETE',
@@ -553,11 +525,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	// --- private methods: WFM workflows
-	// createWorkflow: Creates a new workflow
 	private async _createWorkflow(temp_name: string, data: string): Promise<void> {
 		
 		console.log('executing createWorkflow()');
-
 		// make a temp folder so VsCode doese't throw up an error in that the folder doesen't exist when created
 		this.workflow_folders[temp_name.replace('.yaml', '')] = new FileStat('', 'directory', 0, 0, data.length, false);
 
@@ -653,10 +623,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	// updateWorkflow: Updates an existing workflow
 	private async _updateWorkflow(name: string, data: string, rename: boolean): Promise<void> {
 		console.log("executing updateWorkflow(" + name + ")");
-		console.log('rename: ', rename);
+
 		const yaml = require('yaml');
 		let defname = Object.keys(yaml.parse(data)).filter((value) => value !== "version")[0] + '.yaml';
-		console.log('defname: ', defname);
 		if ((defname !== name) && (!rename)) { // If the name in the definition is different from the filename and not a rename
 			if (Object.keys(this.workflows).indexOf(defname)=== -1) { // if the  name is not in the workflows
 				vscode.window.showInformationMessage('Workflow Name changed, creating new workflow.');
@@ -695,7 +664,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				throw vscode.FileSystemError.Unavailable('Workflow validation failed!');
 			}
 			let json = await response.json();
-
 			if (json.response.data.valid === 'false') {
 				vscode.window.showErrorMessage(json.response.data.error);
 				throw vscode.FileSystemError.NoPermissions('Invalid Workflow Definition');
@@ -709,7 +677,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			} else {
 				id = this.workflows[name].id;
 			}
-			console.log('id: ', id);
 			// change to DRAFT
 			url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/status';
 			console.log('url: ', url);
@@ -766,7 +733,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				console.log('defName in workflows', defname);	
 				this.readDirectory(vscode.Uri.parse("wfm:/workflows/"));
 			} else { // here we update the workflow cache
-				console.log("here::::");
 				this.workflows[name].ctime = Date.parse(entry.created_at);
 				this.workflows[name].mtime = Date.parse(entry.updated_at);
 				this.workflows[name].size  = data.length;
@@ -796,21 +762,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 			vscode.window.showInformationMessage('Success: Workflow published');
 			await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
-
-			if (this.localsave===true) {
-				let fs = require("fs");
-				console.log("Saving a backup locally in the temp folder "+this.localpath);
-				let extURI = vscode.Uri.parse("file://"+this.localpath);
-				let filepath = vscode.Uri.joinPath(extURI, defname).toString().replace("file://","");
-				console.log('filepath: ', filepath);
-				console.log('extURI', extURI);
-				fs.writeFile(filepath, data, (err) => {
-					if(err) {
-						console.log(err); 
-					}
-					console.log("Successfully saved in local repo."); 
-				});
-			}
+			this.saveBackupLocally(name, data);
 		}
 		console.log('completed updating workflow');
 	}
@@ -916,6 +868,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	private async _writeWorkflowView(name: string, data: string): Promise<void> {
 		console.log('executing writeWorkflowView()');
+		
 		if (name.replace('.json', '.yaml') in this.workflows) { // We are modifying an existing workflow documentation (editor)
 			// make an api call to get the full view info and then update only the data attribute
 			let id = this.workflows[name.replace('.json', '.yaml')].id;
@@ -960,8 +913,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (!token) {
 			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
 		}
-		console.log('data sent to updateWorkflowView: ', data);
-		console.log('data type: ', typeof(data));
+		console.log("data: ", data);
 		// upload readme to workflow
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/ui';
 		console.log('url: ', url);
@@ -984,24 +936,14 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 		vscode.window.showInformationMessage('Success: Workflow View uploaded to NSP');
 
-		// update workflow cache
+		// update workflow view cache
 		let json = await response.json();
 		let entry = json.response.data;
+		// Finish updating workflow views Cache
 
-		if (this.localsave===true) {
-			let fs = require("fs");
-			console.log("Saving a backup locally in the temp folder "+this.localpath);
-			let extURI = vscode.Uri.parse("file://"+this.localpath);
-			let filepath = vscode.Uri.joinPath(extURI, name).toString().replace("file://","");
-			console.log('filepath: ', filepath);
-			console.log('extURI', extURI);
-			fs.writeFile(filepath, data, (err) => {
-				if(err) {
-					console.log(err); 
-				}
-				console.log("Successfully saved in local repo."); 
-			});
-		}
+		
+
+		this.saveBackupLocally(name, data);
 		console.log('completed updating workflow view');
 	}
 
@@ -1127,7 +1069,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const ctime = Date.parse(entry.created_at);
 		const mtime = Date.parse(entry.updated_at);
 		this.actions[name] = new FileStat(id, 'file', ctime, mtime, data.length, false);
-
 		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
 	}
 
@@ -1204,6 +1145,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			this.actions[name].mtime = Date.parse(entry.updated_at);
 			this.actions[name].size  = data.length;
 		}
+		this.saveBackupLocally(name, data);
 	}
 
 	private async _deleteAction(name: string): Promise<void> {
@@ -1772,8 +1714,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/action?fields=id,name,created_at,updated_at&is_system=false"; 
 		} else if (uri.toString() === "wfm:/templates") { // if were in templates directory, set the url to get the templates
 			url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/jinja-template?fields=id,name,created_at,updated_at";	
-		} else if (uri.toString().startsWith("wfm:/workflows/")) {
-			console.log('URI: wfm:/workflows/');
+		} else if (uri.toString().startsWith("wfm:/workflows/")) { // if were in tehe workflow folders dir
 			url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow?fields=id,name,created_at,updated_at,tags";
 		} else {
 			throw vscode.FileSystemError.FileNotADirectory('Unknown resouce!');
@@ -2121,6 +2062,23 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			console.log("BEFORE OR AFTER ERROR");
 		} else {
 			throw vscode.FileSystemError.NoPermissions('Unknown Resource!');
+		}
+	}
+
+	saveBackupLocally(name: string, data: string): void {
+		if (this.localsave===true) {
+			let fs = require("fs");
+			console.log("Saving a backup locally in the temp folder "+this.localpath);
+			let extURI = vscode.Uri.parse("file://"+this.localpath);
+			let filepath = vscode.Uri.joinPath(extURI, name).toString().replace("file://","");
+			console.log('filepath: ', filepath);
+			console.log('extURI', extURI);
+			fs.writeFile(filepath, data, (err) => {
+				if(err) {
+					console.log(err); 
+				}
+				console.log("Successfully saved in local repo."); 
+			});
 		}
 	}
 

@@ -111,7 +111,7 @@ export function activate(context: vscode.ExtensionContext) {
 			secretStorage.store("nsp_wfm_password", passwordInput);
 		};
 	  });
-	  // checks if
+	// checks if
 	vscode.workspace.onDidChangeWorkspaceFolders(async () => {
 		const workspaceFolders =  vscode.workspace.workspaceFolders ?  vscode.workspace.workspaceFolders : [];
 		if (workspaceFolders.find( ({name}) => name === 'nsp-workflow')) {
@@ -128,5 +128,4 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Add Workflow Manager folder to workspace
 	vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders.length : 0, null, { uri: vscode.Uri.parse('wfm:/'), name: "Workflow Manager" });
-
 }

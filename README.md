@@ -17,9 +17,10 @@ Nokia logo is trademark of Nokia
 The vsCode extension for NSP WFM allows a user to:
 
 * Connect to a remote WFM.
-* Download the full workflow and action list.
-* Create new workflows and actions (with a predefined template).
-* Modify and automatically upload workflow changes.
+* Download the full workflow, action, and jinja templates list.
+* Create new workflows, actions, and templates (with a predefined template).
+* Access and Edit WFM's workflow definitions, views, and documentations.
+* Modify (CRUD operations) and automatically upload workflow changes to NSP.
 * Validate the format (requires RedHat's YAML extension).
 * Retrieve the status from the latest execution.
 * Access WFM with the right pointers to workflows and executions.
@@ -82,7 +83,7 @@ To make the extension work, make sure you configure the following attributed in 
 
 ## Release Notes
 
-See release changes in Changelog.
+See release changes in [CHANGLOG](./CHANGELOG.md)
 
 ## Contributors
 
