@@ -92,6 +92,11 @@
           "group": "navigation"
         },
         {
+          "when": "resourceScheme == wfm && resourceLangId == json",
+          "command": "nokia-wfm.generateForm",
+          "group": "navigation"
+        },
+        {
           "when": "resourceLangId == yaml",
           "command": "nokia-wfm.openInBrowser",
           "group": "navigation"
@@ -124,6 +129,12 @@
         "category": "WFM",
         "title": "Execute Workflow",
         "icon": "$(run)"
+      },
+      {
+        "command": "nokia-wfm.generateForm",
+        "category": "WFM",
+        "title": "Generate Form",
+        "icon": "$(eye)"
       },
       {
         "command": "nokia-wfm.applySchema",
@@ -197,5 +208,9 @@
     "vscode-uri": "^3.0.0",
     "yaml": "^2.2.0",
 		"@vscode/codicons": "0.0.20"
+  },
+  "repository": {
+      "type": "git",
+      "url": "https://github.com/nokia/vcode-workflow-manager.git"
   }
 }
