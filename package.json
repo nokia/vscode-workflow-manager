@@ -92,6 +92,11 @@
           "group": "navigation"
         },
         {
+          "when": "resourceScheme == wfm && resourceLangId == json",
+          "command": "nokia-wfm.generateForm",
+          "group": "navigation"
+        },
+        {
           "when": "resourceLangId == yaml",
           "command": "nokia-wfm.openInBrowser",
           "group": "navigation"
@@ -124,6 +129,12 @@
         "category": "WFM",
         "title": "Execute Workflow",
         "icon": "$(run)"
+      },
+      {
+        "command": "nokia-wfm.generateForm",
+        "category": "WFM",
+        "title": "Generate Form",
+        "icon": "$(eye)"
       },
       {
         "command": "nokia-wfm.applySchema",

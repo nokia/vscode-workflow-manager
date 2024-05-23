@@ -67,6 +67,11 @@ export function activate(context: vscode.ExtensionContext) {
 		wfmProvider.upload();
 	}));
 
+	// generate input form for workflow view
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.generateForm', async () => {
+		wfmProvider.generateForm();
+	}));
+
 	// // Generate schema for validation
 	wfmProvider.generateSchema();
 

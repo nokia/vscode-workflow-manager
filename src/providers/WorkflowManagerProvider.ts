@@ -1702,6 +1702,251 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		vscode.workspace.getConfiguration('yaml').update('schemas', schemas);
 	}
 
+	async generateForm(): Promise<void> {
+		const yaml = require('yaml');
+
+		const editor = vscode.window.activeTextEditor;
+
+		let doc = editor.document;
+		const uri = vscode.window.activeTextEditor?.document.uri.toString();
+
+		let current = editor.document.getText();
+
+		let yamlUri = vscode.Uri.parse(uri.replace(".json",".yaml"));
+
+		let bufferrefContent = await this.readFile(yamlUri);
+
+		let yamlText = bufferrefContent.toString();
+
+
+		let uiCommon = function (varName) {
+			return {
+			name: varName,
+			title: varName
+				.match(/[0-9]+|[A-Z]*[a-z]+|[A-Z]+/g)
+				.join(' ')
+				.toUpperCase(),
+			description: 'description for ' + varName,
+			columnSpan: 4,
+			newRow: true,
+			readOnly: false,
+			required: false,
+			}
+		}
+
+		let uiNumber = function (varName, defaultValue) {
+			let uiSpecs = uiCommon(varName)
+			uiSpecs['type'] = 'number'
+			uiSpecs['default'] = defaultValue
+			return uiSpecs
+		}
+
+		let uiBoolean = function (varName, defaultValue) {
+			let uiSpecs = uiCommon(varName)
+			uiSpecs['type'] = 'boolean'
+			uiSpecs['default'] = defaultValue
+			return uiSpecs
+		}
+
+		var uiEnum = function (varName, values) {
+			let uiSpecs = uiCommon(varName)
+			uiSpecs['type'] = 'enum'
+			uiSpecs['enum'] = values
+			return uiSpecs
+		}
+
+		let uiText = function (varName, defaultValue) {
+			let hidden = [
+			'PASS',
+			'PASSWD',
+			'PASSWORD',
+			'SECRET',
+			'AUTH',
+			'AUTHORIZATION',
+			'TOKEN',
+			'CREDS',
+			'CREDENTIALS',
+			'LOGIN',
+			] // eslint-disable-line max-len
+
+			let uiSpecs = uiCommon(varName)
+			if (uiSpecs['title'].split(' ').find((key) => hidden.includes(key))) {
+			uiSpecs['type'] = 'password'
+			uiSpecs['default'] = defaultValue
+			} else {
+			uiSpecs['type'] = 'string'
+			uiSpecs['default'] = defaultValue
+
+			if (defaultValue) {
+				let patterns = [
+				// IPv4 address
+				'^(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))$',
+				// IPv4 subnet
+				'^(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\\/(?:3[0-2]|[0-2]?[0-9])$', // eslint-disable-line max-len
+				// MAC address
+				'^(?:(?:[0-9A-Fa-f]{2}-){5}[0-9A-Fa-f]{2})$',
+				'^(?:(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})$',
+				// URL
+				'^https?:\\/\\/[\\dA-Za-z\\.-]+\\.[A-Za-z\\.]{2,6}(?:[\\/:?=&#][\\dA-Za-z\\.-]+?)*[\\/\\?]?$',
+				// Email
+				"^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$", // eslint-disable-line max-len
+				]
+				uiSpecs['validations'] = {
+				patterns: patterns.filter((p) => RegExp(p).test(defaultValue)),
+				}
+			}
+			}
+			return uiSpecs
+		}
+
+		var uiList = function (varName) {
+			let uiSpecs = uiCommon(varName)
+			uiSpecs['type'] = 'list'
+			uiSpecs['component'] = {
+			input: 'simpleInputPicker',
+			list: 'simplePropertyList',
+			}
+			return uiSpecs
+		}
+
+		var uiSelect = function (varName, cbAction, columns) {
+			let uiSpecs = uiCommon(varName)
+			uiSpecs['type'] = 'list'
+			uiSpecs['component'] = { input: 'picker' }
+			uiSpecs['suggest'] = { action: cbAction }
+			uiSpecs['properties'] = columns.split(',').map(function (key) {
+			return { name: key }
+			})
+			return uiSpecs
+		}
+
+		var uiSelectPaged = function (varName, cbAction, columns) {
+			let uiSpecs = uiCommon(varName)
+			uiSpecs['type'] = 'list'
+			uiSpecs['component'] = { input: 'picker' }
+			uiSpecs['componentProps'] = {
+			isInfinite: true,
+			infiniteProps: { datasource: cbAction },
+			}
+			uiSpecs['properties'] = columns.split(',').map(function (key) {
+			return { name: key }
+			})
+			return uiSpecs
+		}
+
+		var uiSuggest = function (varName, cbAction, column) {
+			let uiSpecs = uiCommon(varName)
+			uiSpecs['type'] = 'string'
+			uiSpecs['component'] = { input: 'autoComplete' }
+			uiSpecs['suggest'] = { action: cbAction, name: [column] }
+			return uiSpecs
+		}
+
+		let properties = []
+		try {
+			let yamlDoc = yaml.parse(yamlText)
+			let name = Object.keys(yamlDoc)[1]
+			let input = yamlDoc[name]['input']
+
+			for (let i = 0; i < input.length; i++) {
+			if (typeof input[i] === 'object') {
+				Object.keys(input[i]).forEach(function (key) {
+				if (key === 'token_auth') {
+					// console.log('ignore token_auth')
+				} else if (typeof input[i][key] === 'string') {
+					// console.log('string or password')
+					properties.push(uiText(key, input[i][key]))
+				} else if (typeof input[i][key] === 'number') {
+					// console.log('number')
+					properties.push(uiNumber(key, input[i][key]))
+				} else if (typeof input[i][key] === 'boolean') {
+					// console.log('boolean')
+					properties.push(uiBoolean(key, input[i][key]))
+				} else if (
+					typeof input[i][key] === 'object' &&
+					input[i][key] !== null
+				) {
+					if (input[i][key].length > 0) {
+					// console.log('list becomes enum')
+					properties.push(uiEnum(key, input[i][key]))
+					} else {
+					// console.log('list is list')
+					properties.push(uiList(key))
+					}
+				} else {
+					// unsupported object
+					// console.log('obj/list not supported')
+				}
+				})
+			} else if (typeof input[i] === 'string') {
+				let key = input[i]
+				if (['neId', 'neName', 'mgmtIP'].includes(key)) {
+				// console.log('neList: ', key)
+				properties.push(uiSuggest(key, 'nspWebUI.neList', key))
+				} else if (key === 'port') {
+				// console.log('port')
+				properties.push(uiSuggest(key, 'nspWebUI.portList', 'name'))
+				} else if (key === 'workflow') {
+				// console.log('workflow')
+				properties.push(uiSuggest(key, 'nspWebUI.wfList', 'name'))
+				} else if (key === 'intentType') {
+				// console.log('intentType')
+				properties.push(uiSuggest(key, 'nspWebUI.intentTypeList', 'name'))
+				} else if (key === 'intent') {
+				// console.log('intent')
+				properties.push(uiSuggest(key, 'nspWebUI.intentList', 'target'))
+				} else if (key === 'nodes') {
+				// console.log('nodes')
+				properties.push(
+					uiSelectPaged(
+					key,
+					'nspWebUI.neListPaged',
+					'ne-id,ne-name,ip-address,version'
+					)
+				)
+				} else if (key === 'ports') {
+				// console.log('ports')
+				properties.push(
+					uiSelectPaged(
+					key,
+					'nspWebUI.portListPaged',
+					'name,ne-id,ne-name,description,admin-state,oper-state'
+					)
+				) // eslint-disable-line max-len
+				} else if (key === 'workflows') {
+				// console.log('workflows')
+				properties.push(
+					uiSelect(key, 'nspWebUI.wfList', 'name,createBy,modifiedBy')
+				)
+				} else if (key === 'intentTypes') {
+				// console.log('intentTypes')
+				properties.push(
+					uiSelect(
+					key,
+					'nspWebUI.intentTypeListWithDetails',
+					'name,version,state'
+					)
+				)
+				} else if (key === 'token_auth') {
+				// console.log('ignore token_auth')
+				} else {
+				// console.log('string or password')
+				properties.push(uiText(input[i], ''))
+				}
+			} else {
+				// console.log(input[i] + ': ' + typeof input[i])
+			}
+			} // end-for
+		} catch (e) {
+			// console.log(JSON.stringify(e, null, 2))
+		} // end-try
+
+  		let uijson = { type: 'object', properties: properties }
+  		editor.edit(editBuilder => {
+			editBuilder.replace(new vscode.Range(doc.lineAt(0).range.start, doc.lineAt(doc.lineCount - 1).range.end), JSON.stringify(uijson, null, 4));
+		});
+	}
+
 	// --- implement FileSystemProvider
 	async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
 		console.log("executing readDirectory("+uri.toString()+")");
