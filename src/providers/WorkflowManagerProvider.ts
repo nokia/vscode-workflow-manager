@@ -277,6 +277,44 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		console.log('completed updating workflow documentation');
 	}
 
+	private async _validateTemplate(data: string): Promise<void> {
+
+		console.log('executing _validateTemplate()');
+		
+		await this._getAuthToken(); // get auth-token
+		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
+		
+		// validate Template definition
+		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/jinja-template/validate';
+		let response: any = await this._callNSP(url, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'text/plain',
+				'Cache-Control': 'no-cache',
+				'Authorization': 'Bearer ' + token
+			},
+			body: data
+		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
+
+		console.log("POST", url, response.status);
+		if (!response.ok) {
+			vscode.window.showErrorMessage('Template validation failed!');
+		} else {
+			let json = await response.json();
+			if (json.response.data.valid === 'false') {
+				vscode.window.showErrorMessage('Invalid Template Definition:', json.response.data.error);
+			} else {
+				vscode.window.showInformationMessage('Success: Template validated');
+			}
+		}
+	}
+
 	// write workflow: Writes a jinja2 template to the NSP and to the local file system
 	private async _writeTemplate(name: string, data: string): Promise<void> {
 		console.log('executing writeTemplate()'); // when adding a file if the file does not end with .jinja throw a vscode error and return
@@ -1334,15 +1372,16 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 		if (editor) {
 			const uri = vscode.window.activeTextEditor?.document.uri.toString();
-			console.error(uri);
 			if (uri?.startsWith('wfm:/workflows/')) {
 				this._validateWorkflow(editor.document.getText());
 			} else if (uri?.startsWith('wfm:/actions/')) {
 				this._validateAction(editor.document.getText());
+			} else if (uri?.startsWith('wfm:/templates/')) {
+				this._validateTemplate(editor.document.getText());
 			} else { // if the uri is not in the workflow manager
 				let doc = YAML.parse(editor.document.getText());
 				let key = Object.keys(doc).filter((value) => value !== "version")[0];
-				if ('base-input' in doc[key+'.yaml']) {
+				if ('base-input' in doc[key+'.yaml']) { // if the key is in the actions 
 					this._validateAction(editor.document.getText());					
 				} else {
 					this._validateWorkflow(editor.document.getText());

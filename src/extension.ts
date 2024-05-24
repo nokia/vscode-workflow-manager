@@ -39,7 +39,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// // --- A handler for the 'nokia-wfm.validate' command when the user clicks the checkmark
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.validate', async () => {
-		wfmProvider.validate();
+		wfmProvider.validate(); // validate an action, workflow, or template.
 	}));
 
 	// // --- A handler to Open workflow in Workflow Manager (Webbrowser) when the user clicks the link
