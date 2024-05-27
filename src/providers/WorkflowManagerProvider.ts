@@ -57,6 +57,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	fileIgnore: Array<string>;
 	secretStorage: vscode.SecretStorage;
 	extContext: vscode.ExtensionContext;
+	nspVersion: number[] | undefined; // NSP version
 	actions: {[name: string]: FileStat}; // DS for actions
 	templates: {[name: string]: FileStat}; // DS for templates
 	workflows: {[name: string]: FileStat}; // DS for workflows
@@ -77,6 +78,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.timeout = timeout;
 		this.fileIgnore = fileIgnore;
 		this.secretStorage = secretStorage;
+		this.nspVersion = undefined;
 		
 		// caching actions/workflows/templates for better performance - updated whenever calling readDirectory()
 		this.actions = {};
@@ -196,6 +198,62 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		return response;
 	}
 
+		/**
+	 * Retrieve and store NSP release in this.nspVersion.
+	 * Release information will be shown to vsCode user.
+	 * 
+	 * Note: currently used to select OpenSearch API version
+	 */	
+
+	private async _getNSPversion(): Promise<void> {
+		console.log("Requesting NSP version");
+				
+		this._getAuthToken(); // get auth-token
+		const token = await this.authToken;
+		if (!token) {
+			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+		}
+
+		const url = "https://"+this.nspAddr+"/internal/shared-app-banner-utils/rest/api/v1/appBannerUtils/release-version";
+		let response: any = await this._callNSP(url, { // get workflow / action definition
+			method: 'GET',
+			headers: {
+				'Cache-Control': 'no-cache',
+				'Authorization': 'Bearer ' + token
+			}
+		});
+
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
+
+		let json = await response.json();
+		const version = json["response"]["data"]["nspOSVersion"];		
+		this.nspVersion = version.match(/\d+\.\d+\.\d+/)[0].split('.').map(num => parseInt(num, 10));
+
+		console.log('NSP VERSION: ', this.nspVersion);
+		vscode.window.showInformationMessage("NSP version: " + version);
+	}
+
+	/**
+	 * Checks if NSP is running at least a specific release
+	 * 
+	 * @param {number} major Major NSP REL
+	 * @param {number} minor Minor NSP REL
+	 */
+
+	private _fromRelease(major: number, minor:number): boolean {
+		if (this.nspVersion) {
+			if (this.nspVersion[0] > major){ 
+				return true;
+			}
+			if (this.nspVersion[0]===major && this.nspVersion[1]>=minor) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	// write workflow: Writes a jinja2 template to the NSP and to the local file system
 	private async _writeWorkflowDocumentation(uri: vscode.Uri, data: string): Promise<void> {
 		console.log('executing writeWorkflowDocumentation('+ uri +')');
@@ -205,7 +263,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow/"+name.replace('.md', '');
 			console.log('url: ', url);
 			
-			 this._getAuthToken(); // get auth-token
+			this._getAuthToken(); // get auth-token
 			const token = await this.authToken;
 			if (!token) {
 				throw vscode.FileSystemError.Unavailable('NSP is not reachable');
@@ -1395,16 +1453,26 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const YAML = require('yaml')
 		const editor = vscode.window.activeTextEditor; // gets the active file that the user is in.
 
+		let prefix = '';
+		if (this._fromRelease(23,11)) {
+			console.log("1");
+			prefix = "https://"+this.nspAddr+"/web"; // url for new navigation since nsp23.11
+		} else {
+			console.log('2');
+			prefix = "https://"+this.nspAddr+":"+this.port;
+		}
 		if (editor) {
 			var uri = vscode.window.activeTextEditor?.document.uri.toString(); // gets it uri
 			if (uri?.startsWith('wfm:/workflows/')) { // if the active file is in workflows
 				const key = uri.split("/").pop().replace('.yaml', '');
-				const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+key;
+				// const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+key;
+				const url = prefix+"/workflow-manager/workflows/"+key;
 				vscode.env.openExternal(vscode.Uri.parse(url));
 			} else if (uri?.startsWith('wfm:/actions/')) { // if the active file is in actions
 				uri = uri.replace('.action', '')
 				const key = uri.toString().substring(13);
-				const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/actions/"+key;
+				// const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/actions/"+key;
+				const url = prefix+"/workflow-manager/actions/"+key;
 				vscode.env.openExternal(vscode.Uri.parse(url));
 			} else { // if the active file is in neither
 				let doc = YAML.parse(editor.document.getText());
@@ -1415,7 +1483,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 						await this.readDirectory(vscode.Uri.parse('wfm:/actions'));
 					}
 					if (key in this.actions) {
-						const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/actions/"+key+ '.action';
+						// const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/actions/"+key+ '.action';
+						const url = prefix+"/workflow-manager/actions/"+key+ '.action';
 						vscode.env.openExternal(vscode.Uri.parse(url));
 					} else {
 						vscode.window.showErrorMessage('Need to upload action '+key+' to WFM first!');
@@ -1426,7 +1495,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 						await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
 					}		
 					if (key in this.workflows) {
-						const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+key+ '.yaml';
+						// const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+key+ '.yaml';
+						const url = prefix + "/workflow-manager/workflows/"+key+ '.yaml';
 						vscode.env.openExternal(vscode.Uri.parse(url));
 					} else {
 						vscode.window.showErrorMessage('Need to upload workflow '+key+' to WFM first!');
@@ -1435,6 +1505,27 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 		}
 	}
+
+
+	/**
+	 * Cross launch NSP WebUI.
+	 * Works with NSP New Navigation (since 23.11)
+	 * 
+	 * @param {string} url WebUI endpoint to open
+	 */
+
+	// private async _openWebUI(url:string): Promise<void> {
+	// 	if (url.startsWith('/web/'))
+	// 		// New navigation since nsp23.11 uses standard https ports 443
+	// 		url = "https://"+this.nspAddr+url;
+	// 	else if (url.startsWith('/intent-manager/'))
+	// 		// Original WebUI until nsp23.8 uses mdt tomcat port 8547
+	// 		url = "https://"+this.nspAddr+":8547"+url;
+	// 	else
+	// 		url = "https://"+this.nspAddr+url;
+
+	// 	vscode.env.openExternal(vscode.Uri.parse(url));
+	// }
 
 	async applySchema(): Promise<void>{ // applySchema returns a promise of void
 		console.log("Executing applySchema()");
@@ -1990,6 +2081,11 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
 		console.log("executing readDirectory("+uri.toString()+")");
 		let url = undefined;
+
+		if (!this.nspVersion) {
+			await this._getNSPversion(); // get the version of the NSP
+		}
+
 		if (uri.toString() === "wfm:/") { // if root
 			return [['actions', vscode.FileType.Directory],['workflows', vscode.FileType.Directory], ['templates', vscode.FileType.Directory]]; // return the actions and workflows and templates.
 		} else if (uri.toString() === "wfm:/workflows") { // if were in workflows directory, set the url to get the workflows
