@@ -2,7 +2,7 @@
  * Copyright 2023 Nokia
  * Licensed under the BSD 3-Clause License.
  * SPDX-License-Identifier: BSD-3-Clause
- */
+*/
 
 'use strict';
 
@@ -27,6 +27,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const fileIgnore : Array<string> = config.get("ignoreTags") ?? [];
 
 	const wfmProvider = new WorkflowManagerProvider(server, username, secretStorage, port, localsave, localpath, timeout, fileIgnore);
+	
 	context.subscriptions.push(vscode.workspace.registerFileSystemProvider('wfm', wfmProvider, { isCaseSensitive: true }));
 	context.subscriptions.push(vscode.window.registerFileDecorationProvider(wfmProvider));
 	wfmProvider.extContext=context;
@@ -77,9 +78,8 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Apply YAML language to all wfm:/actions/* and wfm:/workflows/* files
 	let fileAssociations : {string: string} = vscode.workspace.getConfiguration('files').get('associations') || <{string: string}>{};
-    fileAssociations["/actions/*"] = "yaml";
-    fileAssociations["/workflows/*"] = "yaml";
-	fileAssociations["/templates/*"] = "jinja";
+    fileAssociations["/actions/*"] = "yaml"; // apply YAML language to all wfm:/actions/* files
+
     vscode.workspace.getConfiguration('files').update('associations', fileAssociations);
 
 	// --- WORKFLOW EXAMPLES - When we click the bottom cloud button the nsp-workflow repo
@@ -105,6 +105,7 @@ export function activate(context: vscode.ExtensionContext) {
 			vscode.commands.executeCommand('git.clone', 'https://github.com/nokia/nsp-workflow.git', gitPath);
 		}
 	}));
+	
 	// Set Password for WFM
 	vscode.commands.registerCommand('nokia-wfm.setPassword', async () => {
 		const passwordInput: string = await vscode.window.showInputBox({
@@ -116,7 +117,8 @@ export function activate(context: vscode.ExtensionContext) {
 			secretStorage.store("nsp_wfm_password", passwordInput);
 		};
 	  });
-	// checks if
+	
+	  // checks if
 	vscode.workspace.onDidChangeWorkspaceFolders(async () => {
 		const workspaceFolders =  vscode.workspace.workspaceFolders ?  vscode.workspace.workspaceFolders : [];
 		if (workspaceFolders.find( ({name}) => name === 'nsp-workflow')) {

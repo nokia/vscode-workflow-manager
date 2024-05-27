@@ -2,7 +2,7 @@
   "name": "nokia-wfm",
   "displayName": "NOKIA_WFM",
   "description": "NOKIA WFM vsCode Developer Plugin",
-  "version": "1.1.2",
+  "version": "2.0.0",
   "icon": "media/Nokia_WFM.png",
   "publisher": "Nokia",
   "engines": { 
@@ -102,7 +102,7 @@
           "group": "navigation"
         },
         {
-          "when": "resourceLangId == yaml && activeEditorIsDirty == true",
+          "when": "resourceScheme == wfm && activeEditorIsDirty == true",
           "command": "workbench.files.action.compareWithSaved",
           "group": "navigation"
         },

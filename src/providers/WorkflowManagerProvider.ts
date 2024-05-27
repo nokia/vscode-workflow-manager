@@ -1723,7 +1723,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		});
 
 		const wfmSchema = outpath;
-		const workflowUri = "wfm:/workflows/*";
+		const workflowUri = "wfm:/workflows/*/*";
 		let schemas = vscode.workspace.getConfiguration('yaml').get('schemas');
 		if (schemas[wfmSchema]) {
 			if (Array.isArray(schemas[wfmSchema])) {
@@ -2001,7 +2001,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		} else if (uri.toString().startsWith("wfm:/workflows/")) { // if were in tehe workflow folders dir
 			url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow?fields=id,name,created_at,updated_at,tags";
 		} else {
-			throw vscode.FileSystemError.FileNotADirectory('Unknown resouce!');
+			throw vscode.FileSystemError.FileNotADirectory('Unknown Resource!');
 		}
 
 		await this._getAuthToken(); // get auth-token
@@ -2064,7 +2064,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			);
 		}
 
-		console.log('completed filestat');
 		let filteredList = json?.response.data; // get the list of workflows or actions or templates
 		if (uri.toString() === "wfm:/workflows" ) {
 			function checkLabels(obj,ignoreLabels){
@@ -2101,9 +2100,20 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				permissions: vscode.FilePermission.Readonly
 			};
 		}
-		if (uri.toString().startsWith('wfm:/workflows/') && !uri.toString().includes('.')) {
+
+		let path_length = uri.toString().split('/').length;
+		if (uri.toString().startsWith('wfm:/workflows/') && path_length == 4 && !uri.toString().includes('.')) {
+			throw vscode.FileSystemError.FileNotFound('No Permission to add a folder within a workflow folder!');
+		} else if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().split("/").pop().includes('.') && path_length == 3) {
+			throw vscode.FileSystemError.FileNotFound("No Permission to add a file within the 'workflows' directory!");
+		}
+		
+		else if (uri.toString().startsWith('wfm:/workflows/') && !uri.toString().includes('.')) {
+
+			console.log('this.workflow_folders: ', this.workflow_folders);
+			console.log('this.workflows: ', this.workflows);
+
 			if (Object.keys(this.workflow_folders).length === 0) { // if the workflows are empty
-				console.log(vscode.Uri.parse('wfm:/workflows'))
 				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
 			}
 			const key = uri.toString().split('/')[2];
@@ -2113,19 +2123,15 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
 		} else if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().endsWith('.yaml')) {
 			if (Object.keys(this.workflows).length === 0) { // if the workflows are empty
-				console.log(vscode.Uri.parse('wfm:/workflows'))
 				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
 			}
 			const key = uri.toString().split('/')[3];
-			console.log('key: ', key);
 			if (key in this.workflows) {
-				console.log(this.workflows[key]);
 				return this.workflows[key];
 			}
 			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
 		} else if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().endsWith('.md')) {
 			if (Object.keys(this.workflows).length === 0) {
-				console.log(vscode.Uri.parse('wfm:/workflows'))
 				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
 			}
 			if (!(uri.toString().split('/')[3] === 'README.md')) { // if user attempts to rename the workflow doc to other than README.md
@@ -2133,23 +2139,22 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 			const key = uri.toString().split('/')[2] + '.md';
 			if (key in this.workflow_documentations) {
-				console.log('returning: ', this.workflow_documentations[key])
 				return this.workflow_documentations[key];
 			}
 			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
 		} else if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().endsWith('.json')) {
 			if (Object.keys(this.workflows).length === 0) {
-				console.log(vscode.Uri.parse('wfm:/workflows'))
 				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
 			}
 			const key = uri.toString().split('/')[3];
 			console.log('key: ', key);
 			if (key in this.workflow_views) {
-				console.log('returning: ', this.workflow_views[key])
 				return this.workflow_views[key];
 			}
 			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
-		} else if (uri.toString().startsWith('wfm:/actions/')) {
+		}
+		
+		if (uri.toString().startsWith('wfm:/actions/')) {
 			if (Object.keys(this.actions).length === 0) {
 				console.log(vscode.Uri.parse('wfm:/actions'))
 				await this.readDirectory(vscode.Uri.parse('wfm:/actions'));
@@ -2170,7 +2175,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 			throw vscode.FileSystemError.FileNotFound('Unknown template!');
 		}
-		throw vscode.FileSystemError.FileNotFound('Unknown resouce!');
+		throw vscode.FileSystemError.FileNotFound('No Permissions!');
 	}
 
 	async readFile(uri: vscode.Uri): Promise<Uint8Array> { // VsCode readFile function: returns the file content of the file
@@ -2194,7 +2199,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow/"+id;
 			}
 		} else {
-			throw vscode.FileSystemError.FileNotADirectory('Unknown resouces!');
+			throw vscode.FileSystemError.FileNotADirectory('Unknown Resources!');
 		}
 	
 		await this._getAuthToken(); // get auth-token
@@ -2247,7 +2252,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	// writeFile function: writes the file content to the file and updates the file stat
 	async writeFile(uri: vscode.Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): Promise<void> {
 		console.log("executing writeFile("+uri+")");
-		let url = undefined;
+		
+		let path_length = uri.toString().split('/').length;
+		// if we try to write a file within the workflows directory and we are not in a workflow folder
+		if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().split("/").pop().includes('.') && path_length == 3) {
+			throw vscode.FileSystemError.NoPermissions("No Permissions to add a file within the 'workflows' folder!");
+		}
+		
 		if (uri.toString().startsWith('wfm:/workflows/')) {
 			if (uri.toString().endsWith('.json')) { // if its a view
 				const key = uri.toString().substring(15).split('/').pop();
@@ -2335,15 +2346,16 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			let key = uri.toString().substring(15);
 			await this._deleteTemplate(key);
 		} else {
-			throw vscode.FileSystemError.FileNotFound('Unknown resouces!');
+			throw vscode.FileSystemError.FileNotFound('No Permissions to delete (' + uri +  ')!');
 		}
 	}
 
 	createDirectory(uri: vscode.Uri): void {
 		console.log("executing createDirectory("+uri+")");
-		if (uri.toString().startsWith('wfm:/workflows/')) {
+		if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().split('/').length < 4 && !uri.toString().includes('.')) {
 			this._writeWorkflow(uri.toString().substring(15) + '.yaml', '');
-			console.log("BEFORE OR AFTER ERROR");
+		} else if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().split('/').length >= 4 && !uri.toString().includes('.')) {
+			throw vscode.FileSystemError.NoPermissions('No Permissions to add a folder within a workflow folder!');
 		} else {
 			throw vscode.FileSystemError.NoPermissions('Unknown Resource!');
 		}
