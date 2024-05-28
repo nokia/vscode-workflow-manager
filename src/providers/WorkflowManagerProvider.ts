@@ -233,7 +233,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Note: currently used to select OpenSearch API version
 	*/	
 	private async _getNSPversion(): Promise<void> {
-		console.log("Requesting NSP version");
+		console.log("executing _getNSPversion()");
 				
 		this._getAuthToken(); // get auth-token
 		const token = await this.authToken;
@@ -257,8 +257,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		let json = await response.json();
 		const version = json["response"]["data"]["nspOSVersion"];		
 		this.nspVersion = version.match(/\d+\.\d+\.\d+/)[0].split('.').map(num => parseInt(num, 10));
-
-		console.log('NSP VERSION: ', this.nspVersion);
 		vscode.window.showInformationMessage("NSP version: " + version);
 	}
 
@@ -1509,15 +1507,18 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	*/
 	private async _getWebviewContent(wfnm: string, exectime: string,execstat: string,execid: string,state_info: string,panel: vscode.WebviewPanel): Promise<string> {
 		console.log('executing _getWebviewContent()');
-		let path = require('path');
 
+		const isNSPVersion2311 = this._fromRelease(23, 11);
+		const nspAddr = this.nspAddr;
+		const port = this.port;
+		console.log('isNSPVersion2311: ', isNSPVersion2311);
 		const extURI = this.extContext.extensionUri;
 		const onDiskPath = vscode.Uri.joinPath(extURI, 'media', 'noklogo_black.svg');
 		const catGifSrc = panel.webview.asWebviewUri(onDiskPath);
 		const codiconsUri = panel.webview.asWebviewUri(vscode.Uri.joinPath(extURI, 'node_modules', '@vscode/codicons', 'dist', 'codicon.css'));
 
 		let html=`<!doctype html><html><head><title>WFM Report</title><meta name="description" content="WFM Execution report"><meta name="keywords" content="WFM execution report"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;300&display=swap" rel="stylesheet"><link href="`+codiconsUri+`" rel="stylesheet" /><style>*{ box-sizing: border-box; -webkit-box-sizing: border-box; -moz-box-sizing: border-box;}body{ font-family: 'Poppins', sans-serif; -webkit-font-smoothing: antialiased; background-color: #F8F8F8;}h2{ font-family: 'Poppins', sans-serif; text-align: left; font-size: 14px; letter-spacing: 1px; color: #555; margin: 20px 3%; width: 94%;}h3{ font-family: 'Poppins', sans-serif; text-align: left; font-size: 14px; letter-spacing: 1px; color: #555; margin: 20px 3%; width: 94%;}.publish { height: 100px; width: 100%; overflow-y: auto; }.nokia { display: block; margin-left: auto; margin-right: auto; margin-top: 100px; width: 30%;}.icon { width: 10px; margin-right: 0px;}.accordion > input[type="checkbox"] { position: absolute; left: -100vw;}.accordion .content { overflow-y: hidden; height: 0; transition: height 0.3s ease;}.accordion > input[type="checkbox"]:checked ~ .content { height: auto; overflow: visible;}.accordion label { display: block;}/* Styling*/body { font: 16px/1.5em "Overpass", "Open Sans", Helvetica, sans-serif; color: #333; font-weight: 300;}.accordion { margin-bottom: 1em; margin-left: 3%; width: 94%;}.accordion > input[type="checkbox"]:checked ~ .content { background: #F0F0F0 ; padding: 15px; border-bottom: 1px solid #9E9E9E;}.accordion .handle { margin: 0; font-size: 15px; line-height: 1.2em; width: 100%;}.accordion label { color: #555; cursor: pointer; font-weight: normal; padding: 15px; background: #F8F8F8; border-bottom: 1px solid #9E9E9E;}.accordion label:hover,.accordion label:focus { background: #BEBEBE; color: #001135;font-weight: 500;}/* Demo purposes only*/*,*:before,*:after { box-sizing: border-box;}body { padding: 40px;}a { color: #06c;}p { margin: 0 0 1em; font-size: 13px;}h1 { margin: 0 0 1.5em; font-weight: 600; font-size: 1.5em;}.accordion { max-width: 65em;}.accordion p:last-child { margin-bottom: 0;}</style></head><body><td><img class="nokia" src="`+catGifSrc+`"></td>`;
-		html=html+`<h2>Workflow `+wfnm+`</h2><h2>Execution `+execid+`</h2><h3>Status: `+execstat+` at `+exectime+`</h3>`;
+		html=html+`<h2>Workflow: `+wfnm+`</h2><h2>Execution: `+execid+`</h2><h3>Status: `+execstat+` at `+exectime+`</h3>`;
 		if (execstat==="ERROR") html=html+`<h3>`+state_info+`</h3>`;
 		
 		// get auth-token
@@ -1550,13 +1551,18 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			if (taskstat === "SUCCESS") vscodeicon = `<i class="codicon codicon-pass icon" style="margin-right:20px; font-size:20px; color:green;"></i>`;
 			else if (taskstat === "RUNNING") vscodeicon = `<i class="codicon codicon-refresh" style="margin-right:20px; font-size:20px; color:blue;"></i>`;
 			html=html+`<section class="accordion"><input type="checkbox" name="collapse`+i+`" id="handle`+i+`"> <h2 class="handle"> <label for="handle`+i+`"><img class="icon">`+vscodeicon+taskname+`</label> </h2> <div class="content"> <p><strong>Task name:  </strong>`+taskname+`</p> <p><strong>ID:  </strong>`+taskid+`</p> <p><strong>Status:  </strong>`+taskstat+`</p><p class="publish">`+JSON.stringify(publish, undefined, 4)+`</p>`;
-			if (taskstat === "RUNNING") html=html+`<a href="https://135.228.140.182:8546/workflow-manager/workflows/`+wfnm+`/executions/`+execid+`/tasks/`+taskid+`/actionExecutions">See in WFM</a>`;
+			
+			if (taskstat === "RUNNING") { // change this url to the correct one, no hardcoding
+				if (isNSPVersion2311) {
+					html=html+`<a href="https://`+nspAddr+`/web/workflow-manager/workflow-executions/tasks/action-executions?workflowId=`+wfnm+`&wfExecutionId=`+execid+`&taskId=`+taskid+`">See in WFM</a>`;
+				} else {
+					html=html+`<a href="https://`+nspAddr+`:`+port+`/workflow-manager/executions/`+execid+`/tasks/`+taskid+`">See in WFM</a>`;
+				}
+			}
 			html=html+`</div></section>`;
-
 			i=i+1;
 			console.log(JSON.stringify(publish, undefined, 4));
 		});
-		
 		html=html+`</body></html>`;
 		return html;
 	}
@@ -1564,7 +1570,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	/**
 	 * Method to validate workflows, actions and templates in the editor
 
-	 */
+	*/
 	async validate(): Promise<void> {
 
 		console.log("Executing validate()");
@@ -1601,25 +1607,35 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const editor = vscode.window.activeTextEditor; // gets the active file that the user is in.
 
 		let prefix = '';
+		let isNSPVersion2311 = false;
 		if (this._fromRelease(23,11)) {
-			console.log("1");
-			prefix = "https://"+this.nspAddr+"/web"; // url for new navigation since nsp23.11
+			prefix = "https://"+this.nspAddr+"/web/workflow-manager"; // url for new navigation since NSP 23.11
+			isNSPVersion2311 = true;
 		} else {
-			console.log('2');
-			prefix = "https://"+this.nspAddr+":"+this.port;
+			prefix = "https://"+this.nspAddr+":"+this.port+'/workflow-manager'; // url for old navigation before NSP 23.11
+			isNSPVersion2311 = false;
 		}
+		
 		if (editor) {
 			var uri = vscode.window.activeTextEditor?.document.uri.toString(); // gets it uri
 			if (uri?.startsWith('wfm:/workflows/')) { // if the active file is in workflows
 				const key = uri.split("/").pop().replace('.yaml', '');
-				// const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+key;
-				const url = prefix+"/workflow-manager/workflows/"+key;
+				let url = '';
+				if (isNSPVersion2311) {
+					url = prefix+"/workflows/info?workflowId="+key;
+				} else {
+					url = prefix+"/workflows/"+key;
+				}
 				vscode.env.openExternal(vscode.Uri.parse(url));
 			} else if (uri?.startsWith('wfm:/actions/')) { // if the active file is in actions
 				uri = uri.replace('.action', '')
 				const key = uri.toString().substring(13);
-				// const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/actions/"+key;
-				const url = prefix+"/workflow-manager/actions/"+key;
+				let url = '';
+				if (isNSPVersion2311) {
+					url = prefix+"/actions/update?actionId="+key;
+				} else {
+					url = prefix+"/actions/"+key;
+				}
 				vscode.env.openExternal(vscode.Uri.parse(url));
 			} else { // if the active file is in neither
 				let doc = YAML.parse(editor.document.getText());
@@ -1631,7 +1647,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					}
 					if (key in this.actions) {
 						// const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/actions/"+key+ '.action';
-						const url = prefix+"/workflow-manager/actions/"+key+ '.action';
+						let url = '';
+						if (isNSPVersion2311) {
+							url = prefix+"/actions/update?actionId="+key+ '.action';
+						} else {
+							url = prefix+"/actions/"+key+ '.action';
+						}
+						// const url = prefix+"/workflow-manager/actions/"+key+ '.action';
 						vscode.env.openExternal(vscode.Uri.parse(url));
 					} else {
 						vscode.window.showErrorMessage('Need to upload action '+key+' to WFM first!');
@@ -1643,7 +1665,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					}		
 					if (key in this.workflows) {
 						// const url = "https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+key+ '.yaml';
-						const url = prefix + "/workflow-manager/workflows/"+key+ '.yaml';
+						let url = '';
+						if (isNSPVersion2311) {
+							url = prefix+"/actions/update?actionId="+key+ '.yaml';
+						} else {
+							url = prefix+"/actions/"+key+ '.yaml';
+						}
+						// const url = prefix + "/workflow-manager/workflows/"+key+ '.yaml';
 						vscode.env.openExternal(vscode.Uri.parse(url));
 					} else {
 						vscode.window.showErrorMessage('Need to upload workflow '+key+' to WFM first!');
@@ -1763,9 +1791,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			let execid = data.response.data[0].id;
 			vscode.window.showInformationMessage('Workflow '+wfnm+' execution sent',"See in WFM","Cancel").then((selectedItem) => {
 				if ('See in WFM' === selectedItem) {
-					vscode.env.openExternal(vscode.Uri.parse("https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+wfnm+"/executions/"+execid));
+					if (this._fromRelease(23,11)) {
+						vscode.env.openExternal(vscode.Uri.parse("https://"+this.nspAddr+"/web/workflow-manager/workflow-executions/info?workflowId="+wfnm+"&wfExecutionId="+execid));
+					} else {
+						vscode.env.openExternal(vscode.Uri.parse("https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+wfnm+"/executions/"+execid));
+					}
 				}
-				});
+			});
 		}
 	}
 
@@ -1813,8 +1845,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			let state_info = aux.state_info;
 			var path = require('path');
 			vscode.window.showInformationMessage('Last execution info:'+exectime+"\nwith status: "+execstat,"See in WFM","Details","Cancel").then( async (selectedItem) => {
-				if ('Details' === selectedItem) {
-					//Beta
+				if ('Details' === selectedItem) { //Beta
 					console.log(path.join(this.extContext.extensionPath, 'media'));
 					const panel = vscode.window.createWebviewPanel(
 						'executionReport',
@@ -1825,10 +1856,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					);
 					panel.webview.html = await this._getWebviewContent(wfnm,exectime,execstat,execid,state_info,panel);
 				} else if ('See in WFM' === selectedItem){
-					vscode.env.openExternal(vscode.Uri.parse("https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+wfnm+"/executions/"+aux.id));
+					if (this._fromRelease(23,11)) {
+						vscode.env.openExternal(vscode.Uri.parse("https://"+this.nspAddr+"/web/workflow-manager/workflow-executions/info?workflowId="+wfnm+"&wfExecutionId="+aux.id));
+					} else {
+						vscode.env.openExternal(vscode.Uri.parse("https://"+this.nspAddr+":"+this.port+"/workflow-manager/workflows/"+wfnm+"/executions/"+aux.id));
+					}
 				}
 			});
-			
 		}
 	}
 
@@ -2276,6 +2310,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Cannot get workflow list');
 		}
+		
 		const json = await response.json();
 		if (uri.toString() === "wfm:/workflows") {
 			this.workflow_folders = (json?.response.data ?? []).reduce((workflow_folders: any, entry: any) =>
@@ -2329,7 +2364,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			console.log('URI: wfm:/templates')
 			var result: [string, vscode.FileType][] = (filteredList ?? []).map(entry => [entry.name + '.jinja', vscode.FileType.File] as [string, vscode.FileType]);			
 		} else if (uri.toString().startsWith("wfm:/workflows/")) { // returns a workflow folder
-			console.log('should be here');
 			let curr_workflow_name = uri.toString().substring(15);
 			var result: [string, vscode.FileType][] = [[curr_workflow_name + '.yaml', vscode.FileType.File], [curr_workflow_name + '.json', vscode.FileType.File], ['README.md', vscode.FileType.File]];
 		}
@@ -2362,10 +2396,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 		
 		else if (uri.toString().startsWith('wfm:/workflows/') && !uri.toString().includes('.')) {
-
-			console.log('this.workflow_folders: ', this.workflow_folders);
-			console.log('this.workflows: ', this.workflows);
-
 			if (Object.keys(this.workflow_folders).length === 0) { // if the workflows are empty
 				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
 			}
