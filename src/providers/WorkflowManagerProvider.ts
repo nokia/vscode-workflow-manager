@@ -1637,6 +1637,16 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					url = prefix+"/actions/"+key;
 				}
 				vscode.env.openExternal(vscode.Uri.parse(url));
+			} else if (uri?.startsWith('wfm:/templates/')) {
+				uri = uri.replace('.jinja', '')
+				const key = uri.toString().substring(15);
+				let url = '';
+				if (isNSPVersion2311) {
+					url = prefix+"/jinja-template/update?jinjaName="+key;
+				} else {
+					url = prefix+"/jinjatemplate/"+key;
+				}
+				vscode.env.openExternal(vscode.Uri.parse(url));
 			} else { // if the active file is in neither
 				let doc = YAML.parse(editor.document.getText());
 				let key = Object.keys(doc).filter((value) => value !== "version")[0];

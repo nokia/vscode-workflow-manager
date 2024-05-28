@@ -35,6 +35,7 @@ export function activate(context: vscode.ExtensionContext) {
 	
 	const header = new CodelensProvider(server); 
 	context.subscriptions.push(vscode.languages.registerCodeLensProvider({language: 'yaml', scheme: 'wfm'}, header));
+	context.subscriptions.push(vscode.languages.registerCodeLensProvider({language: 'jinja', scheme: 'wfm'}, header));
 	console.log(header)
 	// // PUBLISHING COMMANDS
 
@@ -79,8 +80,10 @@ export function activate(context: vscode.ExtensionContext) {
 	// Apply YAML language to all wfm:/actions/* and wfm:/workflows/* files
 	let fileAssociations : {string: string} = vscode.workspace.getConfiguration('files').get('associations') || <{string: string}>{};
     fileAssociations["/actions/*"] = "yaml"; // apply YAML language to all wfm:/actions/* files
-
-    vscode.workspace.getConfiguration('files').update('associations', fileAssociations);
+	fileAssociations["/templates/*"] = "jinja"; // apply YAML language to all wfm:/templates/* files - Needed so that icons can show up for templates
+    fileAssociations["/workflows/*"] = "yaml"; // apply YAML language to all wfm:/workflows/* files
+	
+	vscode.workspace.getConfiguration('files').update('associations', fileAssociations);
 
 	// --- WORKFLOW EXAMPLES - When we click the bottom cloud button the nsp-workflow repo
 	// is cloned to the workspace-

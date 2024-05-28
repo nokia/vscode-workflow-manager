@@ -97,7 +97,7 @@
           "group": "navigation"
         },
         {
-          "when": "resourceLangId == yaml",
+          "when": "resourceLangId == yaml || resourceLangId == jinja",
           "command": "nokia-wfm.openInBrowser",
           "group": "navigation"
         },
@@ -112,7 +112,7 @@
           "group": "navigation"
         },
         {
-          "when": "resourceLangId == yaml || resourceLangId == jinja",
+          "when": "resourceLangId == yaml",
           "command": "nokia-wfm.validate",
           "group": "navigation"
         },
