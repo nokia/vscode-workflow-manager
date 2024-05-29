@@ -1893,9 +1893,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			const obj = YAML.parse(doc);
 			let key = Object.keys(obj).filter((value) => value !== "version")[0];
 			if ('base-input' in obj[key]) {
-				this._writeAction(key, doc);
+				this._writeAction(key+".action", doc);
 			} else {
-				this._writeWorkflow(key, doc);
+				this._writeWorkflow(key+".yaml", doc);
 			}
 		}
 	}
