@@ -1129,7 +1129,12 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		let json = await response.json();
 		let entry = json.response.data;
 		// Finish updating workflow views Cache - BELOW:
-
+		// const ctime = Date.parse(entry.created_at);
+		// const mtime = Date.parse(entry.updated_at);
+		// const size = data.length;
+		// this.workflow_views[name].ctime = ctime;
+		// this.workflow_views[name].mtime = mtime;
+		// this.workflow_views[name].size = size;
 		this.saveBackupLocally(name, data);
 	}
 
@@ -1137,7 +1142,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to write a workflow to NSP
 	 * @param {string} name - name of the file to be written
 	 * @param {string} data - data to be written to the file
-
 	 */
 	private async _writeWorkflow(name: string, data: string): Promise<void> {
 		console.log('executing writeWorkflow('+name+')');
@@ -2489,7 +2493,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		} else if (uri.toString().startsWith("wfm:/workflows/")) {
 			if (uri.toString().endsWith('.json')) { // if its a view
 				let id = uri.toString().substring(15).replace('.json', '').split('/').pop();
-				url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow/"+id+"/ui";
+				url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow/"+id+"/ui"
 			} else if (uri.toString().endsWith('.yaml')) { // if its yaml def or readme
 				let id = uri.toString().substring(15).replace('.yaml', '').split('/').pop();
 				url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow/"+id+"/definition";
@@ -2540,9 +2544,15 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			return Buffer.from(readme); // return only the readme buffer
 		}
 		if (uri.toString().startsWith("wfm:/workflows/") && uri.toString().endsWith('.json')) {
-			let json = JSON.parse(text);
-			let data = json.response.data;
+			let json_text = JSON.parse(text);
+			let data = '';
+			if (json_text.response.data.yang !== undefined && json_text.response.data.json !== undefined) { // if yang and json attributes are generated when rereading the file from NSP we dont account for them
+				data = json_text.response.data.json;
+			} else {
+				data = json_text.response.data;
+			}
 			let formatted = JSON.stringify(data, null, 4);
+			console.log('formatted json: ', formatted);
 			return Buffer.from(formatted); // return the formatted json buffer
 		}
 		return Buffer.from(text); // otherwise return the text buffer
