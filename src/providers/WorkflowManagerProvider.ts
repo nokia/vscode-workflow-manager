@@ -11,6 +11,7 @@ const DECORATION_SIGNED: vscode.FileDecoration =    new vscode.FileDecoration(
 	'Signed',
 	new vscode.ThemeColor('list.deemphasizedForeground')
 );
+
 const DECORATION_UNSIGNED: vscode.FileDecoration =    new vscode.FileDecoration(
 	'',
 	'Unsigned',
@@ -40,7 +41,6 @@ export class FileStat implements vscode.FileStat { // FileStat is a class that c
 		this.signed = signed;
 	}
 }
-
 
 /*
 	Class implementing FileSystemProvider for Workflow Manager
@@ -176,7 +176,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	/**
 	 * Gracefully revoke NSP auth-token.
 	 * Method is called automatically after 10min.
-
 	 */	
 	private async _revokeAuthToken(): Promise<void> {
 		console.log('executing _revokeAuthToken()');
@@ -208,7 +207,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Common error handling and logging is centralized here.
 	 * @param {string} url API endpoint for http request
 	 * @param {any} options HTTP method, header, body
-
 	*/	
 	private async _callNSP(url:string, options:any): Promise<void>{
 		console.log("executing _callNSP(" + url +")");
@@ -282,7 +280,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to update workflow documentation to NSP
 	 * @param {vscode.Uri} uri - URI of the file to be read
 	 * @param {string} data - data to be written to the file
-
 	 */
 	private async _writeWorkflowDocumentation(uri: vscode.Uri, data: string): Promise<void> {
 		console.log('executing writeWorkflowDocumentation('+ uri +')');
@@ -323,7 +320,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to update workflow documentation to NSP
 	 * @param {string} name - name of the file to be updated
 	 * @param {string} data - data to be written to the file
-
 	 */
 	private async _updateWorkflowDocumentation(name: string, data: string): Promise<void> {
 		console.log('executing updateWorkflowDocumentation('+name+')');
@@ -371,7 +367,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	/**
 	 * Method to update workflow Jinja Template to NSP
 	 * @param {string} data - data to be validated by NSP
-
 	 */
 	private async _validateTemplate(data: string): Promise<void> {
 
@@ -415,7 +410,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to write a Jinja Template to NSP
 	 * @param {string} name - fileName of the file to be written
 	 * @param {string} data - data to be written to the file
-
 	 */
 	private async _writeTemplate(name: string, data: string): Promise<void> {
 		console.log('executing writeTemplate()'); // when adding a file if the file does not end with .jinja throw a vscode error and return
@@ -468,7 +462,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to update a Jinja Template to NSP
 	 * @param {string} name - fileName of the file to be updated
 	 * @param {string} data - data to be written to the file
-
 	*/
 	private async _updateTemplate(name: string, data: string): Promise<void> {
 		console.log('executing updateTemplate()');
@@ -529,7 +522,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	/**
 	 * Method to create a jinja Template to NSP
 	 * @param {string} data - data to be written to the template file
-
 	*/
 	private async _createTemplate(data: string): Promise<void> {
 		console.log('executing _createTemplate()');
@@ -606,7 +598,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	/**
 	 * Method to delete a Jinja Template from NSP
 	 * @param {string} name - name of the file to be deleted
-
 	*/
 	private async _deleteTemplate(name: string): Promise<void> {
 		console.log('executing deleteTemplate(+name+)', name);
@@ -643,7 +634,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to rename a Jinja Template in NSP
 	 * @param {string} oldName - old name of the file
 	 * @param {string} newName - new name of the file
-
 	*/
 	private async _renameTemplate(oldName: string, newName: string): Promise<void> {
 		console.log('executing renameTemplate()');
@@ -687,7 +677,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to create a workflow to NSP
 	 * @param {string} name - name of the file to be written
 	 * @param {string} data - data to be written to the file
-
 	*/
 	private async _createWorkflow(temp_name: string, data: string): Promise<void> {
 		
@@ -789,7 +778,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} name - name of the file to be updated
 	 * @param {string} data - data to be written to the file
 	 * @param {boolean} rename - flag to rename the workflow
-
 	*/
 	private async _updateWorkflow(name: string, data: string, rename: boolean): Promise<void> {
 		console.log("executing updateWorkflow(" + name + ")");
@@ -940,7 +928,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	/**
 	 * Method to delete a workflow from NSP
 	 * @param {string} name - name of the file to be deleted
-
 	*/
 	private async _deleteWorkflow(name: string): Promise<void> {
 		console.log('executing deleteWorkflow()');
@@ -1006,7 +993,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	/**
 	 * Method to validate a workflow by calling the NSP and checking if the workflow is valid
 	 * @param {string} data - data to be validated by NSP
-
 	 */
 	private async _validateWorkflow(data: string): Promise<void> {
 		console.log('executing _validateWorkflow()');
@@ -1048,7 +1034,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to write a workflow view to NSP
 	 * @param {string} name - name of the file to be written
 	 * @param {string} data - data to be written to the file
-
 	 */
 	private async _writeWorkflowView(name: string, data: string): Promise<void> {
 		console.log('executing writeWorkflowView()');
@@ -1163,7 +1148,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to rename a workflow in NSP
 	 * @param {string} oldName - old name of the file
 	 * @param {string} newName - new name of the file
-
 	*/
 	private async _renameWorkflow(oldName: string, newName: string): Promise<void> {
 
@@ -1205,7 +1189,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	/**
 	 * Method to create an action to NSP
 	 * @param {string} data - data to be written to the file
-
 	*/
 	private async _createAction(data: string): Promise<void> {
 		console.log('executing createAction()');
@@ -1278,7 +1261,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to update an action to NSP
 	 * @param {string} name - name of the file to be updated
 	 * @param {string} data - data to be written to the file
-
 	*/
 	private async _updateAction(name: string, data: string): Promise<void> {
 		console.log('executing _updateAction()');
@@ -1359,7 +1341,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	/**
 	 * Method to delete an action from NSP
 	 * @param {string} name - name of the file to be deleted
-
 	*/
 	private async _deleteAction(name: string): Promise<void> {
 		console.log('executing deleteAction(+name+)', name);
@@ -1394,7 +1375,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	/**
 	 * Method to validate an action by calling the NSP and checking if the action is valid
 	 * @param {string} data - data to be validated by NSP
-
 	*/
 	private async _validateAction(data: string): Promise<void> {
 
@@ -1438,7 +1418,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to write an action to NSP
 	 * @param {string} name - name of the file to be written
 	 * @param {string} data - data to be written to the file
-
 	*/
 	private async _writeAction(name: string, data: string): Promise<void> {
 		console.log('executing _writeAction()');
@@ -1460,7 +1439,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to rename an action in NSP
 	 * @param {string} oldName - old name of the file
 	 * @param {string} newName - new name of the file
-
 	*/
 	private async _renameAction(oldName: string, newName: string): Promise<void> {
 		console.log('executing renameAction()');
@@ -1507,7 +1485,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} execid - id of the execution
 	 * @param {string} state_info - state information
 	 * @param {vscode.WebviewPanel} panel - webview panel
-	 * @returns {Promise<string>}
 	*/
 	private async _getWebviewContent(wfnm: string, exectime: string,execstat: string,execid: string,state_info: string,panel: vscode.WebviewPanel): Promise<string> {
 		console.log('executing _getWebviewContent()');
@@ -1573,7 +1550,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	/**
 	 * Method to validate workflows, actions and templates in the editor
-
 	*/
 	async validate(): Promise<void> {
 
@@ -1697,7 +1673,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 	/**
 	 * Method to apply JSON schema to the active text editor
-
 	*/
 	async applySchema(): Promise<void>{ // applySchema returns a promise of void
 		console.log("Executing applySchema()");
@@ -1726,7 +1701,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	
 	/**
 	 * Method to execute a workflow in WFM
-
 	*/
 	async execute(): Promise<void>{
 		console.log('executing execute()');
@@ -1893,9 +1867,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			const obj = YAML.parse(doc);
 			let key = Object.keys(obj).filter((value) => value !== "version")[0];
 			if ('base-input' in obj[key]) {
-				this._writeAction(key, doc);
+				this._writeAction(key + '.action', doc);
 			} else {
-				this._writeWorkflow(key, doc);
+				this._writeWorkflow(key + '.yaml', doc);
 			}
 		}
 	}
@@ -2552,7 +2526,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				data = json_text.response.data;
 			}
 			let formatted = JSON.stringify(data, null, 4);
-			console.log('formatted json: ', formatted);
 			return Buffer.from(formatted); // return the formatted json buffer
 		}
 		return Buffer.from(text); // otherwise return the text buffer
