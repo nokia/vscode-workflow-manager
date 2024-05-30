@@ -17,7 +17,7 @@ import { WorkflowManagerProvider, CodelensProvider } from './providers';
 export function activate(context: vscode.ExtensionContext) {  
 
 	const secretStorage: vscode.SecretStorage = context.secrets;
-	const config = vscode.workspace.getConfiguration('workflowManager');
+	const config = vscode.workspace.getConfiguration('workflowManager'); // Gets the configuration settings from the settings.json file
 	const server : string   = config.get("server")   ?? "";
 	const username : string = config.get("username") ?? "";
 	const port : string = config.get("port") ?? "";
