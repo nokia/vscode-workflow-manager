@@ -18,7 +18,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const secretStorage: vscode.SecretStorage = context.secrets;
 	const config = vscode.workspace.getConfiguration('workflowManager'); // Gets the configuration settings from the settings.json file
-	let server : string   = config.get("server")   ?? "";
+	const server : string   = config.get("server")   ?? "";
 	const username : string = config.get("username") ?? "";
 	const port : string = config.get("port") ?? "";
 	const timeout : number = config.get("timeout") ?? 20000;
@@ -85,25 +85,27 @@ export function activate(context: vscode.ExtensionContext) {
 	
 	vscode.workspace.getConfiguration('files').update('associations', fileAssociations);
 
-
 	// NSP - Multiple Server Support:
-	const statusbar_server = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 90);
-	statusbar_server.command = 'nokia-wfm.setServer';
-	statusbar_server.tooltip = 'Set Workflow Manager Server';
-	statusbar_server.text = 'NSP: ' + server;
-	statusbar_server.show();
-	// This will switch NSP Servers - Beta Version for now
-	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.setServer', async () => {
-		const serverInput: string = await vscode.window.showInputBox({
-			value: server,
-			title: "Server",
-			placeHolder: "https://nsp.example.com"
-		}) ?? '';
-		if(serverInput !== ''){
-			config.update("server", serverInput, vscode.ConfigurationTarget.Global);	
-			vscode.commands.executeCommand('workbench.action.reloadWindow');
-		}
-	}));
+	// const statusbar_server = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 90);
+	// statusbar_server.command = 'nokia-wfm.setServer';
+	// statusbar_server.tooltip = 'Set Workflow Manager Server';
+	// statusbar_server.text = 'NSP: ' + server;
+	// statusbar_server.show();
+	// // This will switch NSP Servers - Beta Version for now
+	// context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.setServer', async () => {
+	// 	const serverInput: string = await vscode.window.showInputBox({
+	// 		value: server,
+	// 		title: "Server",
+	// 		placeHolder: "https://nsp.example.com"
+	// 	}) ?? '';
+	// 	if(serverInput !== ''){
+	// 		config.update("server", serverInput, vscode.ConfigurationTarget.Global); This line bugs out the extension and the VsCode settings.json is corrupted
+
+	// 		vscode.commands.executeCommand('workbench.action.reloadWindow');
+	// 		vscode.window.showInformationMessage('Server has been changed to: ' + serverInput); // notification that the server has been changed
+	// 	}
+	// }));
+
 	// --- WORKFLOW EXAMPLES - When we click the bottom cloud button the nsp-workflow repo
 	// is cloned to the workspace-
 	// Add workflow examples to workspace (Bottom Cloud Button)

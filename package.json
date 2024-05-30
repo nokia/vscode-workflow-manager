@@ -125,12 +125,6 @@
     },
     "commands": [
       {
-        "command": "nokia-wfm.setServer",
-        "category": "WFM",
-        "title": "Set Server",
-        "icon": "$(list-unordered)"
-      },
-      {
         "command": "nokia-wfm.execute",
         "category": "WFM",
         "title": "Execute Workflow",

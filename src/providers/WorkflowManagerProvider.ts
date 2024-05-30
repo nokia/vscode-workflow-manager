@@ -262,7 +262,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Checks if NSP is running at least a specific release
 	 * @param {number} major Major NSP REL
 	 * @param {number} minor Minor NSP REL
-	 * @returns {boolean} true if NSP is running at least the specified release
 	*/
 	private _fromRelease(major: number, minor:number): boolean {
 		if (this.nspVersion) {
@@ -280,7 +279,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to update workflow documentation to NSP
 	 * @param {vscode.Uri} uri - URI of the file to be read
 	 * @param {string} data - data to be written to the file
-	 */
+	*/
 	private async _writeWorkflowDocumentation(uri: vscode.Uri, data: string): Promise<void> {
 		console.log('executing writeWorkflowDocumentation('+ uri +')');
 
@@ -320,7 +319,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to update workflow documentation to NSP
 	 * @param {string} name - name of the file to be updated
 	 * @param {string} data - data to be written to the file
-	 */
+	*/
 	private async _updateWorkflowDocumentation(name: string, data: string): Promise<void> {
 		console.log('executing updateWorkflowDocumentation('+name+')');
 		
@@ -359,7 +358,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.workflow_documentations[name.replace('.yaml', '.md')].ctime = Date.parse(entry.created_at);
 		this.workflow_documentations[name.replace('.yaml', '.md')].mtime = Date.parse(entry.updated_at);
 		this.workflow_documentations[name.replace('.yaml', '.md')].size = entry.details.readme.length;
-		
 		this.saveBackupLocally(name, data);
 		console.log('completed updating workflow documentation');
 	}
@@ -788,6 +786,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			if (Object.keys(this.workflows).indexOf(defname)=== -1) { // if the  name is not in the workflows
 				vscode.window.showInformationMessage('Workflow Name changed, creating new workflow.');
 				await this._createWorkflow(defname, data);
+				console.log('txtdoc path: ', vscode.Uri.parse("wfm:/workflows/" + defname.replace('.yaml','') + "/" +defname));
 				let txtdoc = await vscode.workspace.openTextDocument( vscode.Uri.parse("wfm:/workflows/" + defname.replace('.yaml','') + "/" +defname));
 				vscode.window.showTextDocument(txtdoc);
 			} else {
@@ -1262,80 +1261,97 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} name - name of the file to be updated
 	 * @param {string} data - data to be written to the file
 	*/
-	private async _updateAction(name: string, data: string): Promise<void> {
+	private async _updateAction(name: string, data: string, rename: boolean): Promise<void> {
 		console.log('executing _updateAction()');
-		const id = this.actions[name].id;
-		await this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-        }
 
-		// validate action definition
-		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/validate';
-		let response: any = await this._callNSP(url, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'text/plain',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
-			body: data
-		});
-		if (!response){
-			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		const yaml = require('yaml');
+		let defname = Object.keys(yaml.parse(data)).filter((value) => value !== "version")[0] + '.action';
+		if ((defname !== name) && (!rename)) { // If the name in the definition is different from the filename and not a rename
+			if (Object.keys(this.actions).indexOf(defname)=== -1) { // if the  name is not in the actions
+				vscode.window.showInformationMessage('Action Name changed, creating copy of action.');
+				await this._createAction(data);
+				console.log(vscode.Uri.parse("wfm:/actions/" + defname));
+				let txtdoc = await vscode.workspace.openTextDocument( vscode.Uri.parse("wfm:/actions/" + defname));
+				vscode.window.showTextDocument(txtdoc);
+			} else {
+				vscode.window.showErrorMessage("Cloning to an existing Action name is not allowed!");
+			}
+		} else if (this.actions[name].signed) {
+			vscode.window.showErrorMessage("Unable to save SIGNED Action. To create a copy, modify the name in the definition.");
+		} else { // if we need to rename or were just updating
+			const id = this.actions[name].id;
+			await this._getAuthToken(); // get auth-token
+			const token = await this.authToken;
+			if (!token) {
+				throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+			}
+
+			// validate action definition
+			let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/validate';
+			let response: any = await this._callNSP(url, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'text/plain',
+					'Cache-Control': 'no-cache',
+					'Authorization': 'Bearer ' + token
+				},
+				body: data
+			});
+			if (!response){
+				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+			}
+
+			console.log("POST", url, response.status);
+			if (!response.ok) {
+				throw vscode.FileSystemError.NoPermissions('Action validation failed!');
+			}
+			let json = await response.json();
+
+			if (json.response.data.valid === 'false') {
+				vscode.window.showErrorMessage(json.response.data.error);
+				throw vscode.FileSystemError.NoPermissions('Invalid Action Definition');
+			}
+			vscode.window.showInformationMessage('Success: Action validated');
+
+			// upload action
+			url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/'+id+'/definition';
+			response = await this._callNSP(url, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'text/plain',
+					'Cache-Control': 'no-cache',
+					'Authorization': 'Bearer ' + token
+				},
+				body: data
+			});
+			if (!response){
+				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+			}
+
+			console.log("PUT", url, response.status);
+			if (!response.ok) {
+				throw vscode.FileSystemError.Unavailable('Action upload failed! Reason: '+response.statusText);
+			}
+			vscode.window.showInformationMessage('Success: Action uploaded');
+
+			// update action cache
+			json = await response.json();
+			const entry = json.response.data[0];
+
+			if (name !== entry.name + '.action') {
+				vscode.window.showWarningMessage('Action renamed');
+				delete this.actions[name];
+				name = entry.name + '.action';
+				const ctime = Date.parse(entry.created_at);
+				const mtime = Date.parse(entry.updated_at);
+				this.actions[name] = new FileStat(id, 'file', ctime, mtime, data.length, false);			
+			} else {
+				this.actions[name].ctime = Date.parse(entry.created_at);
+				this.actions[name].mtime = Date.parse(entry.updated_at);
+				this.actions[name].size  = data.length;
+			}
+			this.saveBackupLocally(name, data);
 		}
-
-		console.log("POST", url, response.status);
-		if (!response.ok) {
-			throw vscode.FileSystemError.NoPermissions('Action validation failed!');
-		}
-		let json = await response.json();
-
-		if (json.response.data.valid === 'false') {
-			vscode.window.showErrorMessage(json.response.data.error);
-			throw vscode.FileSystemError.NoPermissions('Invalid Action Definition');
-		}
-		vscode.window.showInformationMessage('Success: Action validated');
-
-		// upload action
-		url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/'+id+'/definition';
-		response = await this._callNSP(url, {
-			method: 'PUT',
-			headers: {
-				'Content-Type': 'text/plain',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
-			body: data
-		});
-		if (!response){
-			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-		}
-
-		console.log("PUT", url, response.status);
-		if (!response.ok) {
-			throw vscode.FileSystemError.Unavailable('Action upload failed! Reason: '+response.statusText);
-		}
-		vscode.window.showInformationMessage('Success: Action uploaded');
-
-		// update action cache
-		json = await response.json();
-		const entry = json.response.data[0];
-
-		if (name !== entry.name + '.action') {
-			vscode.window.showWarningMessage('Action renamed');
-			delete this.actions[name];
-			name = entry.name + '.action';
-			const ctime = Date.parse(entry.created_at);
-			const mtime = Date.parse(entry.updated_at);
-			this.actions[name] = new FileStat(id, 'file', ctime, mtime, data.length, false);			
-		} else {
-			this.actions[name].ctime = Date.parse(entry.created_at);
-			this.actions[name].mtime = Date.parse(entry.updated_at);
-			this.actions[name].size  = data.length;
-		}
-		this.saveBackupLocally(name, data);
 	}
 
 	/**
@@ -1425,7 +1441,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			throw vscode.FileSystemError.NoPermissions('Action filename must end with .action');
 		} else{
 			if (name in this.actions) {
-				await this._updateAction(name, data);
+				await this._updateAction(name, data, false);
 			} else {
 				if (data.length === 0) {
 					data = "---\nversion: '2.0'\n\n"+name.replace('.action' ,'')+":\n  description: |\n    action: "+name+"\n  base: nsp.https\n  base-input:\n    url: 'https://restconf-gateway/restconf/operations/nsp-inventory:find'\n    method: POST\n    auth: <% $.token_auth %>      \n    body: \n      input:\n        xpath-filter: /nsp-equipment:network/network-element<% xpath_filter($.formValues.get('filter')) %>\n        offset: <% $.formValues.get('offset') %>\n        limit: <% $.formValues.get('limit') %>\n        fields: ne-id;ne-name;ip-address;version;location;type;product\n        sort-by:\n          - ne-id\n  input:\n    - token_auth\n    - formValues: {}\n  output: <% $.content['nsp-inventory:output'] %>\n";
@@ -1474,7 +1490,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		content[newName.replace('.action','')] = content[oldName.replace('.action','')];
 		delete content[oldName.replace('.action','')];
 
-		await this._updateAction(oldName, yaml.stringify(content)); // update workflow
+		await this._updateAction(oldName, yaml.stringify(content), true); // update workflow
 	}
 
 	/**
@@ -1497,7 +1513,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const onDiskPath = vscode.Uri.joinPath(extURI, 'media', 'noklogo_black.svg');
 		const catGifSrc = panel.webview.asWebviewUri(onDiskPath);
 		const codiconsUri = panel.webview.asWebviewUri(vscode.Uri.joinPath(extURI, 'node_modules', '@vscode/codicons', 'dist', 'codicon.css'));
-
 		let html=`<!doctype html><html><head><title>WFM Report</title><meta name="description" content="WFM Execution report"><meta name="keywords" content="WFM execution report"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;300&display=swap" rel="stylesheet"><link href="`+codiconsUri+`" rel="stylesheet" /><style>*{ box-sizing: border-box; -webkit-box-sizing: border-box; -moz-box-sizing: border-box;}body{ font-family: 'Poppins', sans-serif; -webkit-font-smoothing: antialiased; background-color: #F8F8F8;}h2{ font-family: 'Poppins', sans-serif; text-align: left; font-size: 14px; letter-spacing: 1px; color: #555; margin: 20px 3%; width: 94%;}h3{ font-family: 'Poppins', sans-serif; text-align: left; font-size: 14px; letter-spacing: 1px; color: #555; margin: 20px 3%; width: 94%;}.publish { height: 100px; width: 100%; overflow-y: auto; }.nokia { display: block; margin-left: auto; margin-right: auto; margin-top: 100px; width: 30%;}.icon { width: 10px; margin-right: 0px;}.accordion > input[type="checkbox"] { position: absolute; left: -100vw;}.accordion .content { overflow-y: hidden; height: 0; transition: height 0.3s ease;}.accordion > input[type="checkbox"]:checked ~ .content { height: auto; overflow: visible;}.accordion label { display: block;}/* Styling*/body { font: 16px/1.5em "Overpass", "Open Sans", Helvetica, sans-serif; color: #333; font-weight: 300;}.accordion { margin-bottom: 1em; margin-left: 3%; width: 94%;}.accordion > input[type="checkbox"]:checked ~ .content { background: #F0F0F0 ; padding: 15px; border-bottom: 1px solid #9E9E9E;}.accordion .handle { margin: 0; font-size: 15px; line-height: 1.2em; width: 100%;}.accordion label { color: #555; cursor: pointer; font-weight: normal; padding: 15px; background: #F8F8F8; border-bottom: 1px solid #9E9E9E;}.accordion label:hover,.accordion label:focus { background: #BEBEBE; color: #001135;font-weight: 500;}/* Demo purposes only*/*,*:before,*:after { box-sizing: border-box;}body { padding: 40px;}a { color: #06c;}p { margin: 0 0 1em; font-size: 13px;}h1 { margin: 0 0 1.5em; font-weight: 600; font-size: 1.5em;}.accordion { max-width: 65em;}.accordion p:last-child { margin-bottom: 0;}</style></head><body><td><img class="nokia" src="`+catGifSrc+`"></td>`;
 		html=html+`<h2>Workflow: `+wfnm+`</h2><h2>Execution: `+execid+`</h2><h3>Status: `+execstat+` at `+exectime+`</h3>`;
 		if (execstat==="ERROR") html=html+`<h3>`+state_info+`</h3>`;
@@ -2594,7 +2609,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (oldUri.toString().startsWith('wfm:/workflows/') && newUri.toString().startsWith('wfm:/workflows/')) {
 			const oldName : string = oldUri.toString().substring(15);
 			const newName : string = newUri.toString().substring(15);
-			if (!newName.endsWith('.yaml')) { // if the newName does not end with .yaml throw a vscode error and return
+			if (!newName.endsWith('.yaml')) {
 				await this._renameWorkflow(oldName + '.yaml', newName + '.yaml');
 			} else {
 				await this._renameWorkflow(oldName, newName);
