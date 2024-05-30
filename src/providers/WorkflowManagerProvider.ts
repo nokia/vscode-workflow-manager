@@ -34,8 +34,8 @@ export class FileStat implements vscode.FileStat { // FileStat is a class that c
 		if (fileType === 'directory') {
 			this.type = vscode.FileType.Directory;
 		}
-		this.ctime = Date.now();
-		this.mtime = Date.now();
+		this.ctime = ctime;
+		this.mtime = mtime;
 		this.size = 0;
 		this.id = id;
 		this.signed = signed;
