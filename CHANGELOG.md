@@ -103,3 +103,12 @@ ____
     - Users cannot delete any of the workflow files, as each of the files is associateed with the workflow. In order to delete a workflow and its associative files, the user must delete the associative workflow folder.
     - Users cannot rename any of the three workflow files as the name of the view, the definition, and the workflow folder must be the same. Renaming workflows is supported by renaming the associative workflow folder which will automatically rename the workflow files within that folder to match. 
 ____
+
+## [2.0.1]
+
+**Updates:**
+
+* Bug Fixes: 
+    - Fixed issues with the generateSchema function and modified the wfm-schema-builder Jinja template to prevent red highlights/warnings in the workflow definitions if they are correct.
+    - Workflow folder names containing dots (.) were causing unexpected behavior. Addressed the issue with workflow folder names containing dots. This fix allows workflow names to include dots without causing errors.
+____
