@@ -2417,7 +2417,6 @@ async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 	}
 
 	let path_length = uri.toString().split('/').length;
-	console.log('path_length: ', path_length);
 	if (uri.toString().startsWith('wfm:/workflows/') && path_length > 3 && !(uri.toString().endsWith('.yaml') || uri.toString().endsWith('.json') || uri.toString().endsWith('.md'))) {
 		throw vscode.FileSystemError.FileNotFound('No Permission to add a folder/file within a workflow folder!');
 	}
@@ -2618,12 +2617,13 @@ async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 	*/	
 	async rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { overwrite: boolean }): Promise<void> {
 		console.log("executing rename("+oldUri+", "+newUri+")");
-		
+		if (oldUri.toString().endsWith('.') || newUri.toString().endsWith('.')) {
+			throw vscode.FileSystemError.NoPermissions('No Permissions!');
+		}
 		if (oldUri.toString().startsWith('wfm:/workflows/') && newUri.toString().includes('.md')) {
 			throw vscode.FileSystemError.NoPermissions('No Permissions!');
 		}
 		if (oldUri.toString().startsWith('wfm:/workflows/') && newUri.toString().endsWith('.json') || newUri.toString().endsWith('.yaml')) {
-			let uri_folder_name = oldUri.toString().split("/").pop().split(".")[0];
 			throw vscode.FileSystemError.NoPermissions('Must rename the workflow folder!');
 		}
 		if (oldUri.toString().startsWith('wfm:/workflows/') && newUri.toString().startsWith('wfm:/workflows/')) {
