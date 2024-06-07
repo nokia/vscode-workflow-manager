@@ -48,6 +48,10 @@
                             "type": "string",
                             "examples": ["LSO RnD team"]
                         },
+                        "signature": {
+                            "title": "Workflow signature.",
+                            "markdownDescription": "Signature of the workflow."
+                        },
                         "version": {
                             "title": "Version of the workflow.",
                             "markdownDescription": "Version of the workflow. Semantic versioning pattern must be used. *Optional*.",
@@ -57,9 +61,7 @@
                         },
                         "license": {
                             "title": "Workflow license",
-                            "markdownDescription": "Workflow license. *Optional*.",
-                            "type": "string",
-                            "examples": [""]
+                            "markdownDescription": "Workflow license. *Optional*."
                         },
                         "package": {
                             "title": "Package identifier.",
@@ -73,6 +75,19 @@
                             "type": "boolean",
                             "examples": [true, false]
                         },
+                        "urls": {
+                            "title": "URLs",
+                            "markdownDescription": "URLs associated with the workflow.",
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "title": "URL type",
+                                    "markdownDescription": "URL type.",
+                                    "type": "string",
+                                    "examples": ["git"]
+                                }
+                            }
+                        },
                         "dependencies":{
                             "title": "Workflow platform or nodal dependencies",
                             "markdownDescription": "Dependencies to particular nodal releases of NSP/NFM-P releases",
@@ -84,6 +99,9 @@
                                     "type":"object",
                                     "properties": {
                                         "nfmpOS":{
+                                            "type":"array"
+                                        },
+                                        "nfmp":{
                                             "type":"array"
                                         },
                                         "nspOS":{
