@@ -2,7 +2,7 @@
   "name": "nokia-wfm",
   "displayName": "NOKIA_WFM",
   "description": "NOKIA WFM vsCode Developer Plugin",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "icon": "media/Nokia_WFM.png",
   "publisher": "Nokia",
   "engines": { 
