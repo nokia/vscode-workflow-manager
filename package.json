@@ -211,6 +211,6 @@
   },
   "repository": {
       "type": "git",
-      "url": "https://github.com/nokia/vcode-workflow-manager.git"
+      "url": "https://github.com/nokia/vscode-workflow-manager.git"
   }
 }
