@@ -1,10 +1,15 @@
 # NOKIA Workflow Manager VsCode extension
 
-This VsCode extension connects to Nokia NSP WFM to facilitate workflow development and delivery.
+<p align="center">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/Nokia_WFM.png" width="250">
+</p>
+
+
+This VsCode extension connects to Nokia NSP WFM to facilitate and optimise workflow development and delivery within the VsCode IDE. A virtual filesystem is implemented so that your NSP Workflow Manager's workflows, actions, and tempates can be developed and delivered within the VsCode editor.
 
 ## License
 
-Copyright 2023 Nokia
+Copyright 2024 Nokia
 
 Licensed under the BSD 3-Clause License.
 
@@ -23,8 +28,8 @@ The vsCode extension for NSP WFM allows a user to:
 * Validate the format (requires RedHat's YAML extension).
 * Retrieve the status from the latest execution.
 * Access WFM with the right pointers to workflows and executions.
-* Do all above mentioned actions on a local repository (local folder, git).
-
+* Do all abovementioned actions on a local repository (local folder, git).
+* Switch between different NSP endpoints and access different WFM instances.
 
 ## Requirements
 This package uses YAML, FETCH, vscode-URI and base-64 packages. For FETCH, it is importan to install 2.6.6 version. See other requirements in package.json.
@@ -36,8 +41,12 @@ To compile and generate the VSIX for installation, run:
     npm run compile
     vsce package
 
+## Contribute
 
-## VsCode Extension Development
+Contributions are welcome via normal pull request procedure.
+
+### VsCode Extension Development
+
 1. To compile the typescript extension run:
 
 ```bash
@@ -51,8 +60,62 @@ npm run compile
     - ctrl+shift+F5
 ____
 
-## Contribute
-Contributions are welcome via normal pull request procedure.
+### Build VSIX
+
+Please make sure, you've got the following installed in your environment:
+
+```
+# npm install -g typescript
+# npm install -g @vscode/vsce
+```
+
+Installation can be validated like this:
+
+```
+% npm list -g             
+/usr/local/lib/node_modules/node/lib
+├── @vscode/vsce@2.27.0
+└── typescript@5.4.5
+```
+
+Before you compile and build the distribution, make sure all depended modules
+are installed:
+
+```
+% npm install .
+% npm list
+nokia-intent-manager@2.1.1 ~/dev/vscode-intent-manager
+├── @types/node@18.19.34
+├── @types/vscode@1.90.0
+├── @typescript-eslint/eslint-plugin@6.21.0
+├── @typescript-eslint/parser@6.21.0
+├── @vscode/codicons@0.0.36
+├── base-64@1.0.0
+├── esbuild@0.21.5
+├── eslint@8.57.0
+├── lodash@4.17.21
+├── node-fetch@2.7.0
+├── nunjucks@3.2.4
+├── typescript@5.4.5
+├── vscode-uri@3.0.8
+├── vse@0.5.1
+└── yaml@2.4.5
+```
+
+To see all dependencies, you can run `npm list --all`.
+In cases of any issues, visit the `npm doctor`.
+
+To compile and generate the VSIX for installation, run:
+
+    vsce package
+
+_____
+
+### Install From VSIX:
+
+![alt text](media/vsix.png)
+
+____
 
 ## Extension Settings
 

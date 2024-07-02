@@ -31,14 +31,12 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.workspace.registerFileSystemProvider('wfm', wfmProvider, { isCaseSensitive: true }));
 	context.subscriptions.push(vscode.window.registerFileDecorationProvider(wfmProvider));
 	wfmProvider.extContext=context;
-	console.log("Workflow Manager Provider registered");
 	
 	const header = new CodelensProvider(server); 
 	context.subscriptions.push(vscode.languages.registerCodeLensProvider({language: 'yaml', scheme: 'wfm'}, header));
 	context.subscriptions.push(vscode.languages.registerCodeLensProvider({language: 'jinja', scheme: 'wfm'}, header));
-	console.log(header)
-	// // PUBLISHING COMMANDS
 
+	// // PUBLISHING COMMANDS
 	// // --- A handler for the 'nokia-wfm.validate' command when the user clicks the checkmark
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.validate', async () => {
 		wfmProvider.validate(); // validate an action, workflow, or template.
@@ -77,12 +75,17 @@ export function activate(context: vscode.ExtensionContext) {
 	// // Generate schema for validation
 	wfmProvider.generateSchema();
 
+	context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (e) => {
+		if (e.affectsConfiguration('workflowManager')) {
+			wfmProvider.updateSettings(); // config has changed
+		}
+	}));
+
 	// Apply YAML language to all wfm:/actions/* and wfm:/workflows/* files
 	let fileAssociations : {string: string} = vscode.workspace.getConfiguration('files').get('associations') || <{string: string}>{};
     fileAssociations["/actions/*"] = "yaml"; // apply YAML language to all wfm:/actions/* files
 	fileAssociations["/templates/*"] = "jinja"; // apply YAML language to all wfm:/templates/* files - Needed so that icons can show up for templates
     fileAssociations["/workflows/*"] = "yaml"; // apply YAML language to all wfm:/workflows/* files
-	
 	vscode.workspace.getConfiguration('files').update('associations', fileAssociations);
 
 	// --- WORKFLOW EXAMPLES - When we click the bottom cloud button the nsp-workflow repo
@@ -101,10 +104,8 @@ export function activate(context: vscode.ExtensionContext) {
 		const repoUri = vscode.Uri.joinPath(gitUri, 'nsp-workflow');
 
 		if (fs.existsSync(repoUri.fsPath)) {
-			console.log('nsp-workflow already exists, add to workspace');
 			vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders.length : 0, null, { uri: repoUri});
 		} else {
-			console.log('clone nsp-workflow to add to workspace');
 			vscode.commands.executeCommand('git.clone', 'https://github.com/nokia/nsp-workflow.git', gitPath);
 		}
 	}));
@@ -121,7 +122,7 @@ export function activate(context: vscode.ExtensionContext) {
 		};
 	  });
 	
-	  // checks if
+	  // checks if the workspace folder is nsp-workflow and hides the examples button
 	vscode.workspace.onDidChangeWorkspaceFolders(async () => {
 		const workspaceFolders =  vscode.workspace.workspaceFolders ?  vscode.workspace.workspaceFolders : [];
 		if (workspaceFolders.find( ({name}) => name === 'nsp-workflow')) {
