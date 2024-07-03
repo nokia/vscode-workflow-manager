@@ -18,8 +18,8 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const secretStorage: vscode.SecretStorage = context.secrets;
 	const config = vscode.workspace.getConfiguration('workflowManager'); // Gets the configuration settings from the settings.json file
-	const server : string   = config.get("server")   ?? "";
-	const username : string = config.get("username") ?? "";
+	const server : string   = config.get("NSPIP")   ?? "";
+	const username : string = config.get("user") ?? "";
 	const port : string = config.get("port") ?? "";
 	const timeout : number = config.get("timeout") ?? 20000;
 	const localsave : boolean = config.get("localStorage.enable") ?? false;
@@ -109,18 +109,20 @@ export function activate(context: vscode.ExtensionContext) {
 			vscode.commands.executeCommand('git.clone', 'https://github.com/nokia/nsp-workflow.git', gitPath);
 		}
 	}));
-	
-	// Set Password for WFM
-	vscode.commands.registerCommand('nokia-wfm.setPassword', async () => {
-		const passwordInput: string = await vscode.window.showInputBox({
-		  password: true, 
-		  title: "Password"
-		}) ?? '';
-		
-		if(passwordInput !== ''){
-			secretStorage.store("nsp_wfm_password", passwordInput);
-		};
-	  });
+
+	vscode.commands.registerCommand('nokia-wfm.connect', async (username: string|undefined, password: string|undefined, nspAddr: string|undefined) => {
+		const config = vscode.workspace.getConfiguration('workflowManager');
+		if (username === undefined)
+			username = await vscode.window.showInputBox({title: "Username"});
+		if (username !== undefined)
+			config.update("user", username, vscode.ConfigurationTarget.Workspace);
+		if (password === undefined)
+			password = await vscode.window.showInputBox({password: true, title: "Password"});
+		if (password !== undefined)
+			secretStorage.store("nsp_wfm_password", password);
+		config.update("NSPIP", nspAddr, vscode.ConfigurationTarget.Workspace);
+	});
+
 	
 	  // checks if the workspace folder is nsp-workflow and hides the examples button
 	vscode.workspace.onDidChangeWorkspaceFolders(async () => {

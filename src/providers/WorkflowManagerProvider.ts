@@ -130,13 +130,15 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
         this.pluginLogs.info("executing getAuthToken()");
 
         if (this.authToken) {
-            if (!(await this.authToken)) {
-                this.authToken = undefined;
-            }
+            const token = await this.authToken;
+            if (!token) {
+                this.authToken = undefined; // Reset authToken, if it is undefined
+            } else {
+				return; // If we have a valid token, no need to proceed further
+			}
         }
-
+		
 		this.password = await this.secretStorage.get("nsp_wfm_password");
-
         if (this.password && !this.authToken) {
             this.authToken = new Promise((resolve, reject) => {
 				
@@ -2614,7 +2616,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.fileIgnore = config.get('ignoreTags') ?? [];
 		this.localsave = config.get("localStorage.enable") ?? false;
 		this.localpath = config.get("localStorage.folder") ?? "";
-		const nsp:string = config.get('server') ?? 'localhost';
+		const nsp:string = config.get('NSPIP') ?? 'localhost';
 		const user:string = config.get("user") ?? "admin";
 		const port:string = config.get("port") ?? "443";
 		const pass = await this.secretStorage.get("nsp_wfm_password");
