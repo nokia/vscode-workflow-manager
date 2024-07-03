@@ -5,6 +5,8 @@
 */
 
 import * as vscode from 'vscode';
+import fetch = require('node-fetch');
+import base64 = require('base-64');
 
 const COLOR_OK            = new vscode.ThemeColor('gitDecoration.untrackedResourceForeground'); // appears green
 const COLOR_READONLY      = new vscode.ThemeColor('list.deemphasizedForeground');
@@ -83,7 +85,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} localpath path to save workflows locally
 	 * @param {number} timeout in seconds
 	 * @param {fileIgnore} fileIgnore hide intent-types with provided labels to keep filesystem clean
-	 */	
+	*/	
 
 	constructor (nspAddr: string, username: string, secretStorage: vscode.SecretStorage, port: string, localsave: boolean, localpath: string, timeout: number, fileIgnore: Array<string>) {
 		this.nspAddr = nspAddr;
@@ -127,32 +129,31 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	* revoked after 10min.
 	*/	
 	private async _getAuthToken(): Promise<void> {
-        this.pluginLogs.info("executing getAuthToken()");
-
         if (this.authToken) {
-            const token = await this.authToken;
+			const token = await this.authToken;
             if (!token) {
                 this.authToken = undefined; // Reset authToken, if it is undefined
             } else {
 				return; // If we have a valid token, no need to proceed further
 			}
         }
-		
+
 		this.password = await this.secretStorage.get("nsp_wfm_password");
+
         if (this.password && !this.authToken) {
             this.authToken = new Promise((resolve, reject) => {
-				
                 this.pluginLogs.warn("No valid auth-token; Getting a new one...");
                 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-                const fetch = require('node-fetch');
-                const base64 = require('base-64');
+				// for getting the auth-token, we are using a reduced timeout of 10sec
                 const timeout = new AbortController();
-                setTimeout(() => timeout.abort(), this.timeout);
+                setTimeout(() => timeout.abort(), 10000);
 
                 const url = "https://"+this.nspAddr+"/rest-gateway/rest/api/v1/auth/token";
+				const startTS = Date.now();
+
                 fetch(url, {
-                    method: 'POST',
+                    method: "POST",
                     headers: {
                         'Content-Type': 'application/json',
                         'Cache-Control': 'no-cache',
@@ -160,29 +161,37 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
                     },
                     body: '{"grant_type": "client_credentials"}',
                     signal: timeout.signal
-                }).then(response => {
-                    if (!response.ok) {
-						this.pluginLogs.warn("NSP response:", response.status);
-						DECORATION_DISCONNECTED.tooltip = "Authentication failure (user:"+this.username+")!";
+                }).then(async (response:any) => {
+					const duration = Date.now()-startTS;
+                    this.pluginLogs.info("POST", url, "finished within", duration, "ms");
+
+					const json = await response.json();
+                    if (response.ok) {
+						this.pluginLogs.info("NSP response:", response.status);
+						resolve(json.access_token);
+						this.pluginLogs.info("new authToken:", json.access_token);
+						setTimeout(() => this._revokeAuthToken(), 600000); // automatically revoke token after 10min
+                    } else {
+						this.pluginLogs.warn("NSP response:", response.status, json.error);
+						DECORATION_DISCONNECTED.tooltip = "Authentication failure (user:"+this.username+", error:"+json.error+")!";
 						this._eventEmiter.fire(vscode.Uri.parse('wfm:/'));
-						vscode.window.showErrorMessage("WFM: NSP Auth Error");
+						this.authToken = undefined; // Reset authToken on error
                         reject("Authentication Error!");
-                        throw new Error("Authentication Error!");
-                    }
-                    return response.json();
-                }).then(json => {
-                    resolve(json.access_token);
-                    setTimeout(() => this._revokeAuthToken(), 600000); // automatically revoke token after 10min
-                }).catch(error => {
-					this.pluginLogs.error("Getting authToken failed with", error.message);
-					vscode.window.showWarningMessage("NSP is not reachable");
-                    DECORATION_DISCONNECTED.tooltip = this.nspAddr+" unreachable!";
+					}
+                }).catch((error:any) => {
+					if (error.message.includes('user aborted'))
+						this.pluginLogs.error("No response for getting authToken within 10sec");
+					else
+						this.pluginLogs.error("Getting authToken failed with", error.message);
+
+					DECORATION_DISCONNECTED.tooltip = this.nspAddr+" unreachable!";
 					this._eventEmiter.fire(vscode.Uri.parse('wfm:/'));
-					resolve(undefined);
+
+					this.authToken = undefined; // Reset authToken on error					
+                    resolve(undefined);
                 });
             });
         }
-		this.pluginLogs.info("completed _getAuthToken()");
     }
 
 	/**
@@ -317,10 +326,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	/**
 	 * Retrieve and store NSP release in this.nspVersion.
 	 * Release information will be shown to vsCode user.
-	 * 
 	 * Note: currently used to select OpenSearch API version
-	 */	
-
+	*/	
 	private async _getNSPversion(): Promise<void> {
 		this.pluginLogs.info("Requesting NSP version");
 		const url = "https://"+this.nspAddr+"/internal/shared-app-banner-utils/rest/api/v1/appBannerUtils/release-version";
@@ -333,6 +340,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		let json : any = await response.json();		
 		this.nspVersion = json.response.data.nspOSVersion.match(/\d+\.\d+(?=\.\d+)/)[0];
 		this.pluginLogs.info("NSP version:", this.nspVersion);
+
 		this._eventEmiter.fire(vscode.Uri.parse('wfm:/'));
 
 		this.pluginLogs.info("Requesting OSD version");
@@ -2616,6 +2624,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.fileIgnore = config.get('ignoreTags') ?? [];
 		this.localsave = config.get("localStorage.enable") ?? false;
 		this.localpath = config.get("localStorage.folder") ?? "";
+
 		const nsp:string = config.get('NSPIP') ?? 'localhost';
 		const user:string = config.get("user") ?? "admin";
 		const port:string = config.get("port") ?? "443";
