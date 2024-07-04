@@ -17,6 +17,8 @@ SPDX-License-Identifier: BSD-3-Clause
 
 Nokia logo is trademark of Nokia
 
+
+
 ## Features
 The vsCode extension for NSP WFM allows a user to:
 
@@ -31,21 +33,41 @@ The vsCode extension for NSP WFM allows a user to:
 * Do all abovementioned actions on a local repository (local folder, git).
 * Switch between different NSP endpoints and access different WFM instances.
 
+
 ## Requirements
 This package uses YAML, FETCH, vscode-URI and base-64 packages. For FETCH, it is importan to install 2.6.6 version. See other requirements in package.json.
 
-## Install
-To compile and generate the VSIX for installation, run:
 
-    npm install .
-    npm run compile
-    vsce package
+## Extension Settings and Usage
+
+### Storage of Workflows to Local Filesystem
+
+To allow local storage of workflows, you need to configure the following attributes in the VsCode workflowManager extension settings: 
+
+**ctrl+shift+p > Preferences: Open Settings > Extensions > Workflow Manager**
+
+* `Allow local storage`: Enable the local storage of workflows when saving, to keep as backup.
+* `Local storage folder`: Folder where workflows are copied, if the above flag is enabled.
+* `Ignore tags`: List of tags to be ignored by the plugin, to reduce the amount of workflows shown in the workflow list. When modified, the user will have to reload the vsCode window.
+* `Timeout`: Connection timeout in milliseconds (default 20000).
+
+### Connect to NSP WFM
+
+To connect to an NSP WFM, you need to configure the following attributes in **workspace settings:**
+
+**ctrl+shift+p > Preferences: Open Workspace Settings > Extensions > Workflow Manager**
+
+* `NSP IP address`: Ip address of the remote NSP server.
+* `NSP user`: User name.
+* `NSP password`: User's Password.
+* `NSP port`: Port to connect to the NSP server.
+
 
 ## Contribute
 
 Contributions are welcome via normal pull request procedure.
 
-### VsCode Extension Development
+## Run a live instance of the extension - VsCode Extension Development
 
 1. To compile the typescript extension run:
 
@@ -54,13 +76,19 @@ npm run compile
 ```
 
 2. To run and open the live instance of the extension, open the VsCode Debugger and make sure you have extension.ts open in the VsCode editor.
-    - ctrl+shift+p > Debug: Start Debugging >  VsCode Extension Development
+
+```bash
+- ctrl+shift+p > Debug: Start Debugging >  VsCode Extension Development
+```
 
 3. After changes are made to the source code you  must recompile the extension in step 1. and then you must restart the extension devlopment host to reflect the changes:
-    - ctrl+shift+F5
-____
 
-### Build VSIX
+```bash
+- ctrl+shift+F5
+```
+
+
+## Build and install VSIX
 
 Please make sure, you've got the following installed in your environment:
 
@@ -106,28 +134,21 @@ To see all dependencies, you can run `npm list --all`.
 In cases of any issues, visit the `npm doctor`.
 
 To compile and generate the VSIX for installation, run:
+```bash
+npm run compile
+vsce package
+```
+To install the VSIX run:
 
-    vsce package
+```bash
+code --install-extension <path-to-vsix-file>
+```
 
 _____
 
-### Install From VSIX:
-
-![alt text](media/vsix.png)
-
-____
-
-## Extension Settings
-
-To make the extension work, make sure you configure the following attributed in the extension configuration:
-
-* `NSP IP address`: Ip address of the remote NSP server.
-* `NSP user`: User name.
-* `NSP password`: User's Password.
-* `Allow local storage`: Enable the local storage of workflows when saving, to keep as backup.
-* `Local storage folder`: Folder where workflows are copied, if the above flag is enabled.
 
 ## Known Issues
+
 * Minor errors are reported by the vsCode. However, the extension runs without aparent issue. To be reviewed.
 * First version. Will require deeper error control.
 * `process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"` disbles SSL verification (not recommended).
