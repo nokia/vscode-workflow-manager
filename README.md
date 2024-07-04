@@ -7,6 +7,8 @@
 
 This VsCode extension connects to Nokia NSP WFM to facilitate and optimise workflow development and delivery within the VsCode IDE. A virtual filesystem is implemented so that your NSP Workflow Manager's workflows, actions, and tempates can be developed and delivered within the VsCode editor.
 
+<br>
+
 ## License
 
 Copyright 2024 Nokia
@@ -17,7 +19,7 @@ SPDX-License-Identifier: BSD-3-Clause
 
 Nokia logo is trademark of Nokia
 
-
+<br>
 
 ## Features
 The vsCode extension for NSP WFM allows a user to:
@@ -33,10 +35,12 @@ The vsCode extension for NSP WFM allows a user to:
 * Do all abovementioned actions on a local repository (local folder, git).
 * Switch between different NSP endpoints and access different WFM instances.
 
+<br>
 
 ## Requirements
 This package uses YAML, FETCH, vscode-URI and base-64 packages. For FETCH, it is importan to install 2.6.6 version. See other requirements in package.json.
 
+<br>
 
 ## Extension Settings and Usage
 
@@ -53,7 +57,7 @@ To allow local storage of workflows, you need to configure the following attribu
 
 ### Connect to NSP WFM
 
-To connect to an NSP WFM, you need to configure the following attributes in **workspace settings:**
+To connect to an NSP WFM, you need to configure the following attributes in VsCode **workspace settings:**
 
 **ctrl+shift+p > Preferences: Open Workspace Settings > Extensions > Workflow Manager**
 
@@ -62,10 +66,13 @@ To connect to an NSP WFM, you need to configure the following attributes in **wo
 * `NSP password`: User's Password.
 * `NSP port`: Port to connect to the NSP server.
 
+<br>
 
 ## Contribute
 
 Contributions are welcome via normal pull request procedure.
+
+<br>
 
 ## Run a live instance of the extension - VsCode Extension Development
 
@@ -87,6 +94,7 @@ npm run compile
 - ctrl+shift+F5
 ```
 
+<br>
 
 ## Build and install VSIX
 
@@ -144,7 +152,7 @@ To install the VSIX run:
 code --install-extension <path-to-vsix-file>
 ```
 
-_____
+<br>
 
 
 ## Known Issues
@@ -156,19 +164,30 @@ _____
 * Local files are always treated as workflows. We need a mechanism to differentiate workflows from actions in local folders.
 * In-line validation only works for workflows, not for actions (requires JSON schema for actions).
 
+<br>
+
 ## TODOs
 * Fix Known Issues. Review/Optimize code.
+
+<br>
 
 ## Release Notes
 See release changes in [CHANGELOG](./CHANGELOG.md)
 
-## Contributors
-* [Alejandro Aguado](mailto:alejandro.aguado_martin@nokia.com)
-* [Sven Wisotzky](mailto:sven.wisotzky@nokia.com)
-* [Abdulrahman Awad](mailto:abdulrahmansawad@gmail.com)
+<br>
 
+## Contributors
+
+
+| Contributor      | Contact                                                                       |
+| --------         | -------                                                                       |
+| Alejandro Aguado | [alejandro.aguado_martin@nokia.com](mailto:alejandro.aguado_martin@nokia.com) |
+| Sven Wisotzky    | [sven.wisotzky@nokia.com](mailto:sven.wisotzky@nokia.com)                     |
+| Abdulrahman Awad | [abdulrahmansawad@gmail.com](mailto:abdulrahmansawad@gmail.com)               |
+
+<br>
 
 ## Important links
 
-* Nokia Network Developer Portal: [Developer portal](https://network.developer.nokia.com/learn/23_4/network-programmability-automation-frameworks/workflow-manager-framework/wfm-workflow-development/)
-* VsCode Extension API: [VsCode API](https://code.visualstudio.com/api)
+- Nokia Network Developer Portal: [Developer portal](https://network.developer.nokia.com/learn/23_4/network-programmability-automation-frameworks/workflow-manager-framework/wfm-workflow-development/)
+- VsCode Extension API: [VsCode API](https://code.visualstudio.com/api)
