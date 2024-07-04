@@ -5,17 +5,20 @@
 */
 
 import * as vscode from 'vscode';
+import fetch = require('node-fetch');
+import base64 = require('base-64');
 
-const DECORATION_SIGNED: vscode.FileDecoration =    new vscode.FileDecoration(
-	'🔒',
-	'Signed',
-	new vscode.ThemeColor('list.deemphasizedForeground')
-);
+const COLOR_OK            = new vscode.ThemeColor('gitDecoration.untrackedResourceForeground'); // appears green
+const COLOR_READONLY      = new vscode.ThemeColor('list.deemphasizedForeground');
+const COLOR_CUSTOMIZATION = new vscode.ThemeColor('list.highlightForeground'); // appears blue
+const COLOR_WARNING       = new vscode.ThemeColor('list.warningForeground');
+const COLOR_ERROR         = new vscode.ThemeColor('list.errorForeground');
+const DECORATION_DISCONNECTED = { badge: '❗', tooltip: 'Not connected!', color: COLOR_ERROR };  // should become codicon $(warning)
+const DECORATION_CONNECTED    = { badge: '✔',  tooltip: 'Connecting...', color: COLOR_OK };     // should become codicon $(vm-active)
 
+const DECORATION_SIGNED       = { badge: '🔒', tooltip: 'Workflow: Signed', color: COLOR_READONLY};
 const DECORATION_UNSIGNED: vscode.FileDecoration =    new vscode.FileDecoration(
-	'',
-	'Unsigned',
-	new vscode.ThemeColor('list.highlightForeground')
+	'', 'Workflow: Unsigned', new vscode.ThemeColor('list.highlightForeground')
 );
 
 export class FileStat implements vscode.FileStat { // FileStat is a class that contains the file status
@@ -60,13 +63,15 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	secretStorage: vscode.SecretStorage;
 	extContext: vscode.ExtensionContext;
 	nspVersion: number[] | undefined; // NSP version
+	osdVersion: number[] | undefined; // NSP OSD version
 	actions: {[name: string]: FileStat}; // DS for actions
 	templates: {[name: string]: FileStat}; // DS for templates
 	workflows: {[name: string]: FileStat}; // DS for workflows
 	workflow_documentations: {[name: string]: FileStat}; // DS for workflow_documentations
 	workflow_views: {[name: string]: FileStat}; // DS for workflow_views
 	workflow_folders: {[name: string]: FileStat}; // DS for workflow_folders
-
+	pluginLogs: vscode.LogOutputChannel;
+	
 	public onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[] | undefined>;
     private _eventEmiter: vscode.EventEmitter<vscode.Uri | vscode.Uri[]>;
 
@@ -80,18 +85,18 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} localpath path to save workflows locally
 	 * @param {number} timeout in seconds
 	 * @param {fileIgnore} fileIgnore hide intent-types with provided labels to keep filesystem clean
-	 */	
+	*/	
 
 	constructor (nspAddr: string, username: string, secretStorage: vscode.SecretStorage, port: string, localsave: boolean, localpath: string, timeout: number, fileIgnore: Array<string>) {
 		this.nspAddr = nspAddr;
 		this.username = username;
-		this.password = "";
 		this.authToken = undefined;
 		this.port = port;
 		this.timeout = timeout;
 		this.fileIgnore = fileIgnore;
 		this.secretStorage = secretStorage;
 		this.nspVersion = undefined;
+		this.osdVersion = undefined;
 		
 		// caching actions/workflows/templates for better performance - updated whenever calling readDirectory()
 		this.actions = {};
@@ -101,6 +106,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.workflow_views = {};
 		this.workflow_folders = {};
 
+		// Instantiate the pluginLogs output channel
+		this.pluginLogs = vscode.window.createOutputChannel('nsp-wfm-plugin-logs', {log: true});
+
 		// used for FileDecorator        
 		this._eventEmiter = new vscode.EventEmitter(); // Event emitter for file decorations
         this.onDidChangeFileDecorations = this._eventEmiter.event;
@@ -109,42 +117,43 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	dispose() {
-		console.log("disposing WorkflowManagerProvider()");
+		this.pluginLogs.info("disposing WorkflowManagerProvider()");
 		this._revokeAuthToken();
+		this.pluginLogs.dispose();
 	}
 
 	// --- private methods -----------------------------------
-
 	/**
 	* Retrieves auth-token from NSP. Implementation uses promises to ensure that only
 	* one token is used at any given moment of time. The token will automatically be
 	* revoked after 10min.
 	*/	
 	private async _getAuthToken(): Promise<void> {
-        console.log("executing _getAuthToken()");
-
         if (this.authToken) {
-            if (!(await this.authToken)) {
-                this.authToken = undefined;
-            }
+			const token = await this.authToken;
+            if (!token) {
+                this.authToken = undefined; // Reset authToken, if it is undefined
+            } else {
+				return; // If we have a valid token, no need to proceed further
+			}
         }
 
 		this.password = await this.secretStorage.get("nsp_wfm_password");
 
-        if (!this.authToken) {
+        if (this.password && !this.authToken) {
             this.authToken = new Promise((resolve, reject) => {
-				
-                console.log("No valid auth-token; getting a new one...");
+                this.pluginLogs.warn("No valid auth-token; Getting a new one...");
                 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-                const fetch = require('node-fetch');
-                const base64 = require('base-64');
+				// for getting the auth-token, we are using a reduced timeout of 10sec
                 const timeout = new AbortController();
-                setTimeout(() => timeout.abort(), this.timeout);
+                setTimeout(() => timeout.abort(), 10000);
 
                 const url = "https://"+this.nspAddr+"/rest-gateway/rest/api/v1/auth/token";
+				const startTS = Date.now();
+
                 fetch(url, {
-                    method: 'POST',
+                    method: "POST",
                     headers: {
                         'Content-Type': 'application/json',
                         'Cache-Control': 'no-cache',
@@ -152,75 +161,164 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
                     },
                     body: '{"grant_type": "client_credentials"}',
                     signal: timeout.signal
-                }).then(response => {
-                    console.log("POST", url, response.status);
-                    if (!response.ok) {
-						vscode.window.showErrorMessage("WFM: NSP Auth Error");
+                }).then(async (response:any) => {
+					const duration = Date.now()-startTS;
+                    this.pluginLogs.info("POST", url, "finished within", duration, "ms");
+
+					const json = await response.json();
+                    if (response.ok) {
+						this.pluginLogs.info("NSP response:", response.status);
+						resolve(json.access_token);
+						this.pluginLogs.info("new authToken:", json.access_token);
+						setTimeout(() => this._revokeAuthToken(), 600000); // automatically revoke token after 10min
+                    } else {
+						this.pluginLogs.warn("NSP response:", response.status, json.error);
+						DECORATION_DISCONNECTED.tooltip = "Authentication failure (user:"+this.username+", error:"+json.error+")!";
+						this._eventEmiter.fire(vscode.Uri.parse('wfm:/'));
+						this.authToken = undefined; // Reset authToken on error
                         reject("Authentication Error!");
-                        throw new Error("Authentication Error!");
-                    }
-                    return response.json();
-                }).then(json => {
-                    resolve(json.access_token);
-                    setTimeout(() => this._revokeAuthToken(), 600000); // automatically revoke token after 10min
-                }).catch(error => {
-                    console.error(error.message);
-					vscode.window.showWarningMessage("NSP is not reachable");
+					}
+                }).catch((error:any) => {
+					if (error.message.includes('user aborted'))
+						this.pluginLogs.error("No response for getting authToken within 10sec");
+					else
+						this.pluginLogs.error("Getting authToken failed with", error.message);
+
+					DECORATION_DISCONNECTED.tooltip = this.nspAddr+" unreachable!";
+					this._eventEmiter.fire(vscode.Uri.parse('wfm:/'));
+
+					this.authToken = undefined; // Reset authToken on error					
                     resolve(undefined);
                 });
             });
         }
-		console.log('completed _getAuthToken()');
     }
 
 	/**
 	 * Gracefully revoke NSP auth-token.
-	 * Method is called automatically after 10min.
-	*/	
-	private async _revokeAuthToken(): Promise<void> {
-		console.log('executing _revokeAuthToken()');
-		if (this.authToken) {
-			const token = await this.authToken;
-			console.log("_revokeAuthToken("+token+")");
-			this.authToken = undefined;
+	 */	
 
+	private async _revokeAuthToken(): Promise<void> {
+		this.pluginLogs.info("executing _revokeAuthToken()");
+		if (this.authToken) {
 			const fetch = require('node-fetch');
 			const base64 = require('base-64');
-		
+			const token = await this.authToken;
+			this.pluginLogs.debug("_revokeAuthToken("+token+")");
+			this.authToken = undefined;
+
 			const url = "https://"+this.nspAddr+"/rest-gateway/rest/api/v1/auth/revocation";
 			fetch(url, {
-				method: 'POST',
+				method: "POST",
 				headers: {
-					'Content-Type': 'application/x-www-form-urlencoded',
-					'Authorization': 'Basic ' + base64.encode(this.username+ ":" +this.password)
+					"Content-Type":  "application/x-www-form-urlencoded",
+					"Authorization": "Basic " + base64.encode(this.username+ ":" +this.password)
 				},
-				body: 'token='+token+'&token_type_hint=token'
+				body: "token="+token+"&token_type_hint=token"
 			})
-			.then(response => {
-				console.log("POST", url, response.status);
+			.then((response:any) => {
+				this.pluginLogs.info("POST", url, response.status);
 			});
 		}
 	}
 
+
 	/**
 	 * Private wrapper method to call NSP APIs. Method sets http request timeout.
 	 * Common error handling and logging is centralized here.
+	 * 
 	 * @param {string} url API endpoint for http request
-	 * @param {any} options HTTP method, header, body
-	*/	
-	private async _callNSP(url:string, options:any): Promise<void>{
-		console.log("executing _callNSP(" + url +")");
-		const fetch = require('node-fetch');
+	 * @param {{method: string, body: string, headers: object, signal: AbortSignal}} options HTTP method, header, body
+	 */	
+
+	private async _callNSP(url:string, options:{method: string, body?: string, headers?: object, signal?: AbortSignal}): Promise<void> {
 		const timeout = new AbortController();
-        setTimeout(() => timeout.abort(), this.timeout);
-		options['signal']=timeout.signal;
-		let response: any = new Promise((resolve, reject) => {
-		 	fetch(url, options)
-			.then(response => resolve(response))
-			.catch(error => { 
-				console.log(error.message);
-				vscode.window.showWarningMessage("NSP is not reachable");
-				resolve(undefined)});
+        const fetch = require('node-fetch');
+		setTimeout(() => timeout.abort(), this.timeout*1000);
+		options.signal = timeout.signal;
+
+		if (!('headers' in options)) {
+			await this._getAuthToken();
+			const token = await this.authToken;
+			if (!token)
+				throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+
+			if (url.startsWith('/restconf')) {
+				options.headers = {
+					"Content-Type": "application/yang-data+json",
+					"Accept": "application/yang-data+json",
+					"Authorization": "Bearer " + token
+				};
+				// leave the if-else block to avoid setting headers twice
+			} else if (options.method === 'POST' || (options.method === 'PUT' && !(url.endsWith('/status') || url.endsWith('/ui')))) {
+				options.headers = {
+					'Content-Type': 'text/plain',
+					'Cache-Control': 'no-cache',
+					'Authorization': 'Bearer ' + token
+				}
+			} else if (options.method === 'GET' || options.method === ' DELETE') {
+				options.headers = {
+					'Cache-Control': 'no-cache',
+					'Authorization': 'Bearer ' + token
+				}
+			} else if ((url.endsWith('/status') || url.endsWith('/ui')) && options.method === 'PUT') {
+				options.headers = {
+					'Content-Type': 'application/json',
+					'Cache-Control': 'no-cache',
+					'Authorization': 'Bearer ' + token
+				}
+			} else {
+				options.headers = {
+					'Content-Type': "application/json",
+					'Accept': "application/json",	
+					"Authorization": "Bearer " + token
+				};
+			}
+		}
+
+		if (!url.startsWith('https://')) {
+			if (["443",""].includes(this.port))
+				url = "https://"+this.nspAddr+url;
+			else if (url.startsWith('/logviewer'))
+				url = "https://"+this.nspAddr+url;
+			else if (this.port != "8545")
+				url = "https://"+this.nspAddr+":"+this.port+url;
+			else if (url.startsWith('/restconf'))
+				url = "https://"+this.nspAddr+":8545"+url;
+			else
+				// in case of /mdt/rest/...
+				url = "https://"+this.nspAddr+":8547"+url;
+		}
+
+		const startTS = Date.now();
+		const response: any = new Promise((resolve, reject) => {
+			fetch(url, options).then((response:any) => {
+				response.clone().text().then((body:string) => {
+					const duration = Date.now()-startTS;
+
+					this.pluginLogs.info(options.method, url, options.body??"", "finished within", duration, "ms");
+					if (response.status >= 400)
+						this.pluginLogs.warn("NSP response:", response.status, body);
+					else if ((body.length < 1000) || (this.pluginLogs.logLevel == vscode.LogLevel.Trace))
+						this.pluginLogs.info("NSP response:", response.status, body);
+					else
+						this.pluginLogs.info("NSP response:", response.status, body.substring(0,1000)+'...');
+				});
+				return response;
+			})
+			.then((response:any) => {
+				resolve(response);
+			})
+			.catch((error:any) => {
+				const duration = Date.now()-startTS;
+				let errmsg = options.method+" "+url+" failed with "+error.message+" after "+duration.toString()+"ms!";
+				if (error.message.includes("user aborted"))
+					errmsg = "No response for "+options.method+" "+url+". Call terminated after "+duration.toString()+"ms.";
+
+				this.pluginLogs.error(errmsg);
+				vscode.window.showErrorMessage(errmsg);
+				resolve(undefined);
+			});
 		});
 		return response;
 	}
@@ -231,32 +329,34 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Note: currently used to select OpenSearch API version
 	*/	
 	private async _getNSPversion(): Promise<void> {
-		console.log("executing _getNSPversion()");
-				
-		this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-		}
-
+		this.pluginLogs.info("Requesting NSP version");
 		const url = "https://"+this.nspAddr+"/internal/shared-app-banner-utils/rest/api/v1/appBannerUtils/release-version";
-		let response: any = await this._callNSP(url, { // get workflow / action definition
-			method: 'GET',
-			headers: {
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			}
-		});
-
-		if (!response){
+		this.pluginLogs.info("GET", url);
+		let response: any = await this._callNSP(url, {method: "GET"});
+		if (!response)
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
-		}
+		if (!response.ok)
+			this.pluginLogs.info("NSP version request failed with", response.status);
+		let json : any = await response.json();		
+		this.nspVersion = json.response.data.nspOSVersion.match(/\d+\.\d+(?=\.\d+)/)[0];
+		this.pluginLogs.info("NSP version:", this.nspVersion);
 
-		let json = await response.json();
-		const version = json["response"]["data"]["nspOSVersion"];		
-		this.nspVersion = version.match(/\d+\.\d+\.\d+/)[0].split('.').map(num => parseInt(num, 10));
-		vscode.window.showInformationMessage("NSP version: " + version);
+		this._eventEmiter.fire(vscode.Uri.parse('wfm:/'));
+
+		this.pluginLogs.info("Requesting OSD version");
+		response = await this._callNSP("/logviewer/api/status", {method: "GET"});
+		if (!response)
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP logviewer (opensearch)");
+		if (!response.ok) {
+			const text: string = await response.text();
+			throw vscode.FileSystemError.Unavailable(text);
+		}
+		json = await response.json();
+		this.osdVersion = json.version.number;
+
+		vscode.window.showInformationMessage("Connected to "+this.nspAddr+", NSP version: "+this.nspVersion+", OSD version: "+this.osdVersion);
 	}
+
 
 	/**
 	 * Checks if NSP is running at least a specific release
@@ -276,36 +376,65 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	/**
+	 * Method to validate NSP credentials
+	 * @param {string} ip - IP address of the NSP
+	 * @param {string} username - NSP username
+	 * @param {string} password - NSP password
+	*/
+	private async validateNSPCredentials(ip: string, username: string, password: string): Promise<boolean> {
+
+		this.pluginLogs.info("Executing validateIpCredentials()");
+		const fetch = require('node-fetch');
+		const base64 = require('base-64');
+		const timeout = new AbortController();
+		setTimeout(() => timeout.abort(), this.timeout);
+
+		const url = "https://"+ip+"/rest-gateway/rest/api/v1/auth/token";
+		try {
+			const response = await fetch(url, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Cache-Control': 'no-cache',
+					'Authorization': 'Basic ' + base64.encode(username+ ":" +password)
+				},
+				body: '{"grant_type": "client_credentials"}',
+				signal: timeout.signal
+			});
+			if (!response.ok) {
+				return false;
+			}
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	/**
+	 * Custom implementation of remove an object from an array by id.
+	 * @param {Array} arr Array to remove object from
+	 * @param {string} id ID of object to remove
+	**/
+	private removeObjectByIp(arr, ip) {
+		return arr.filter(function(obj) { return obj.ip !== ip; });
+	}
+
+
+	/**
 	 * Method to update workflow documentation to NSP
 	 * @param {vscode.Uri} uri - URI of the file to be read
 	 * @param {string} data - data to be written to the file
 	*/
 	private async _writeWorkflowDocumentation(uri: vscode.Uri, data: string): Promise<void> {
-		console.log('executing writeWorkflowDocumentation('+ uri +')');
+		this.pluginLogs.info('executing writeWorkflowDocumentation('+ uri +')');
 
 		let name = uri.toString().split("/")[2] + '.md';
 		if (name.replace('.md', '.yaml') in this.workflows) { // We are modifying an existing workflow documentation (editor)
 			let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow/"+name.replace('.md', '');
-			console.log('url: ', url);
-			
-			this._getAuthToken(); // get auth-token
-			const token = await this.authToken;
-			if (!token) {
-				throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-			}
-
-			let response: any = await this._callNSP(url, { // get workflow / action definition
-				method: 'GET',
-				headers: {
-					'Cache-Control': 'no-cache',
-					'Authorization': 'Bearer ' + token
-				}
-			});
-
+			let response: any = await this._callNSP(url, { method: 'GET'}); // get workflow / action definition
 			if (!response){
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			}
-			console.log("GET", url, response.status);
 			if (!response.ok) {
 				throw vscode.FileSystemError.FileNotFound('');
 			}
@@ -321,32 +450,17 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} data - data to be written to the file
 	*/
 	private async _updateWorkflowDocumentation(name: string, data: string): Promise<void> {
-		console.log('executing updateWorkflowDocumentation('+name+')');
+		this.pluginLogs.info('executing updateWorkflowDocumentation('+name+')');
 		
 		const id = this.workflows[name].id;
-		await this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-		}
-
-		// upload readme to workflow
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/readme';
-		console.log('url: ', url);
-		let response: any = await this._callNSP(url, {
-			method: 'PUT',
-			headers: {
-				'Content-Type': 'text/plain',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
-			body: data
-		});
+		let response: any = await this._callNSP(url, {method: 'PUT', body: data});
+
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("PUT", url, response.status);
+		this.pluginLogs.info("PUT", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Workflow upload failed! Reason: '+response.statusText);
 		}
@@ -359,7 +473,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.workflow_documentations[name.replace('.yaml', '.md')].mtime = Date.parse(entry.updated_at);
 		this.workflow_documentations[name.replace('.yaml', '.md')].size = entry.details.readme.length;
 		this.saveBackupLocally(name, data);
-		console.log('completed updating workflow documentation');
+		this.pluginLogs.info('completed updating workflow documentation');
 	}
 
 	/**
@@ -367,31 +481,16 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} data - data to be validated by NSP
 	 */
 	private async _validateTemplate(data: string): Promise<void> {
-
-		console.log('executing _validateTemplate()');
-		
-		await this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-        }
-		
+		this.pluginLogs.info('executing _validateTemplate()');
+	
 		// validate Template definition
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/jinja-template/validate';
-		let response: any = await this._callNSP(url, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'text/plain',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
-			body: data
-		});
+		let response: any = await this._callNSP(url, { method: 'POST', body: data });
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("POST", url, response.status);
+		this.pluginLogs.info("POST", url, response.status);
 		if (!response.ok) {
 			vscode.window.showErrorMessage('Template validation failed!');
 		} else {
@@ -410,7 +509,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} data - data to be written to the file
 	 */
 	private async _writeTemplate(name: string, data: string): Promise<void> {
-		console.log('executing writeTemplate()'); // when adding a file if the file does not end with .jinja throw a vscode error and return
+		this.pluginLogs.info('executing writeTemplate()'); // when adding a file if the file does not end with .jinja throw a vscode error and return
 		if (!name.endsWith('.jinja')) { // if the newName does not end with .yaml throw a vscode error and return
 			throw vscode.FileSystemError.NoPermissions('Jinja Template filename must end with .jinja');
 		} else {
@@ -418,28 +517,17 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				// make an api call to get the full template information and then update only the template attribute
 				let id = this.templates[name].id;
 				let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/jinja-template/"+id+"/definition";
-
-				await this._getAuthToken(); // get auth-token
-				const token = await this.authToken;
-				if (!token) {
-					throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-				}
-
 				let response: any = await this._callNSP(url, { // get workflow / action definition
-					method: 'GET',
-					headers: {
-						'Cache-Control': 'no-cache',
-						'Authorization': 'Bearer ' + token
-					}
+					method: 'GET'
 				});
 
 				if (!response){
 					throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 				}
 
-				console.log("GET", url, response.status);
+				this.pluginLogs.info("GET", url, response.status);
 				if (!response.ok) {
-					console.log(response);
+					this.pluginLogs.info(response);
 					throw vscode.FileSystemError.FileNotFound('Template not found');
 				}
 
@@ -462,34 +550,21 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} data - data to be written to the file
 	*/
 	private async _updateTemplate(name: string, data: string): Promise<void> {
-		console.log('executing updateTemplate()');
-		
-		const yaml = require('yaml');
+		this.pluginLogs.info('executing updateTemplate()');
 		const id = this.templates[name].id; // get the template id
-
-		await this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-		}
 
 		// API call to update template:
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/jinja-template/'+id;
-		console.log('url: ', url);
+		this.pluginLogs.info('url: ', url);
 		let response: any = await this._callNSP(url, {
 			method: 'PUT',
-			headers: {
-				'Content-Type': 'text/plain',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
 			body: data
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("PUT", url, response.status);
+		this.pluginLogs.info("PUT", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Template upload failed! Reason: '+response.statusText);
 		}
@@ -514,7 +589,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
 		this.saveBackupLocally(name, data);
-		console.log('completed updating template');
+		this.pluginLogs.info('completed updating template');
 	}
 
 	/**
@@ -522,30 +597,20 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} data - data to be written to the template file
 	*/
 	private async _createTemplate(data: string): Promise<void> {
-		console.log('executing _createTemplate()');
-
-		await this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-        }
-		console.log('defualt data: ', data);
+		this.pluginLogs.info('executing _createTemplate()');
+		this.pluginLogs.info('defualt data: ', data);
+		
 		// validate template definition
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/jinja-template/validate';
 		let response: any = await this._callNSP(url, {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'text/plain',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
 			body: data
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("POST", url, response.status);
+		this.pluginLogs.info("POST", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Template validation failed!');
 		}
@@ -561,18 +626,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/jinja-template';
 		response = await this._callNSP(url, {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'text/plain',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
 			body: data
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("POST", url, response.status);
+		this.pluginLogs.info("POST", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Template creation failed! Reason: '+response.statusText);
 		}
@@ -598,29 +658,18 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} name - name of the file to be deleted
 	*/
 	private async _deleteTemplate(name: string): Promise<void> {
-		console.log('executing deleteTemplate(+name+)', name);
+		this.pluginLogs.info('executing deleteTemplate(+name+)', name);
 
 		const id : string = this.templates[name].id;
-		
-		await this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-		}
-
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/jinja-template/'+id.replace('.jinja', '');
 		let response: any = await this._callNSP(url, {
-			method: 'DELETE',
-			headers: {
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			}
+			method: 'DELETE'
 		});
 		if (!response) {
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("DELETE", url, response.status);
+		this.pluginLogs.info("DELETE", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Template deletion failed! Reason: '+response.statusText);
 		}
@@ -634,32 +683,21 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} newName - new name of the file
 	*/
 	private async _renameTemplate(oldName: string, newName: string): Promise<void> {
-		console.log('executing renameTemplate()');
+		this.pluginLogs.info('executing renameTemplate()');
 
 		let id = this.templates[oldName].id;
 		let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/jinja-template/"+id+"/definition";
-
-		await this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-		}
-
 		let response: any = await this._callNSP(url, { // get workflow / action definition
-			method: 'GET',
-			headers: {
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			}
+			method: 'GET'
 		});
 
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("GET", url, response.status);
+		this.pluginLogs.info("GET", url, response.status);
 		if (!response.ok) {
-			console.log(response);
+			this.pluginLogs.info(response);
 			throw vscode.FileSystemError.FileNotFound('Template not found');
 		}
 
@@ -667,7 +705,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const yaml = require('yaml');
 		const doc = yaml.parse(text);
 		doc.name = newName.replace('.jinja', ''); // update the template attribute
-		console.log('doc: ', doc);
+		this.pluginLogs.info('doc: ', doc);
 		await this._updateTemplate(oldName, yaml.stringify(doc));
 	}
 
@@ -678,32 +716,19 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	*/
 	private async _createWorkflow(temp_name: string, data: string): Promise<void> {
 		
-		console.log('executing createWorkflow()');
+		this.pluginLogs.info('executing createWorkflow()');
 		// make a temp folder so VsCode doese't throw up an error in that the folder doesen't exist when created
 		this.workflow_folders[temp_name.replace('.yaml', '')] = new FileStat('', 'directory', 0, 0, data.length, false);
-
-		await this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-        }
-
-		// validate workflow definition
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/validate';
 		let response: any = await this._callNSP(url, {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'text/plain',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
 			body: data
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("POST", url, response.status);
+		this.pluginLogs.info("POST", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Workflow validation failed!');
 		}
@@ -719,18 +744,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/definition?provider=';
 		response = await this._callNSP(url, {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'text/plain',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
 			body: data
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("POST", url, response.status);
+		this.pluginLogs.info("POST", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Workflow creation failed! Reason: '+response.statusText);
 		}
@@ -752,23 +772,18 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/status';
 		response = await this._callNSP(url, {
 			method: 'PUT',
-			headers: {
-				'Content-Type': 'application/json',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
 			body: '{"status": "PUBLISHED"}'
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
-		console.log("PUT", url, response.status);
+		this.pluginLogs.info("PUT", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Change mode to PUBLISHED failed! Reason: '+response.statusText);
 		}
 		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
 		vscode.window.showInformationMessage('Success: Workflow published');
-		console.log("completed createWorkflow()");
+		this.pluginLogs.info("completed createWorkflow()");
 	}
 
 	/**
@@ -778,7 +793,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {boolean} rename - flag to rename the workflow
 	*/
 	private async _updateWorkflow(name: string, data: string, rename: boolean): Promise<void> {
-		console.log("executing updateWorkflow(" + name + ")");
+		this.pluginLogs.info("executing updateWorkflow(" + name + ")");
 
 		const yaml = require('yaml');
 		let defname = Object.keys(yaml.parse(data)).filter((value) => value !== "version")[0] + '.yaml';
@@ -786,7 +801,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			if (Object.keys(this.workflows).indexOf(defname)=== -1) { // if the  name is not in the workflows
 				vscode.window.showInformationMessage('Workflow Name changed, creating new workflow.');
 				await this._createWorkflow(defname, data);
-				console.log('txtdoc path: ', vscode.Uri.parse("wfm:/workflows/" + defname.replace('.yaml','') + "/" +defname));
+				this.pluginLogs.info('txtdoc path: ', vscode.Uri.parse("wfm:/workflows/" + defname.replace('.yaml','') + "/" +defname));
 				let txtdoc = await vscode.workspace.openTextDocument( vscode.Uri.parse("wfm:/workflows/" + defname.replace('.yaml','') + "/" +defname));
 				vscode.window.showTextDocument(txtdoc);
 			} else {
@@ -795,28 +810,17 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		} else if (this.workflows[name].signed) {
 			vscode.window.showErrorMessage("Unable to save SIGNED workflow. To create a copy, modify the name in the definition.");
 		} else { // if we need to rename
-			await this._getAuthToken(); // get auth-token
-			const token = await this.authToken;
-			if (!token) {
-				throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-			}
-
 			// validate workflow definition
 			let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/validate';
 			let response: any = await this._callNSP(url, {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'text/plain',
-					'Cache-Control': 'no-cache',
-					'Authorization': 'Bearer ' + token
-				},
 				body: data
 			});
 			if (!response){
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			}
 
-			console.log("POST", url, response.status);
+			this.pluginLogs.info("POST", url, response.status);
 			if (!response.ok) {
 				throw vscode.FileSystemError.Unavailable('Workflow validation failed!');
 			}
@@ -828,7 +832,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			vscode.window.showInformationMessage('Success: Workflow validated');
 
 			let id: string;
-			console.log('name: ', name);
+			this.pluginLogs.info('name: ', name);
 			if (!name.includes('.yaml')) {
 				id = this.workflows[name + '.yaml'].id;
 			} else {
@@ -836,21 +840,16 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 			// change to DRAFT
 			url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/status';
-			console.log('url: ', url);
+			this.pluginLogs.info('url: ', url);
 			response = await this._callNSP(url, {
 				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json',
-					'Cache-Control': 'no-cache',
-					'Authorization': 'Bearer ' + token
-				},
 				body: '{"status": "DRAFT"}'
 			});
 			if (!response){
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			}
 
-			console.log("PUT", url, response.status);
+			this.pluginLogs.info("PUT", url, response.status);
 			if (!response.ok) {
 				throw vscode.FileSystemError.Unavailable('Change mode to DRAFT failed!');
 			}
@@ -858,21 +857,16 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 			// upload workflow
 			url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/definition';
-			console.log('url: ', url);
+			this.pluginLogs.info('url: ', url);
 			response = await this._callNSP(url, {
 				method: 'PUT',
-				headers: {
-					'Content-Type': 'text/plain',
-					'Cache-Control': 'no-cache',
-					'Authorization': 'Bearer ' + token
-				},
 				body: data
 			});
 			if (!response){
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			}
 
-			console.log("PUT", url, response.status);
+			this.pluginLogs.info("PUT", url, response.status);
 			if (!response.ok) {
 				throw vscode.FileSystemError.Unavailable('Workflow upload failed! Reason: '+response.statusText);
 			}
@@ -887,7 +881,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				const ctime = Date.parse(entry.created_at);
 				const mtime = Date.parse(entry.updated_at);
 				this.workflows[defname] = new FileStat(id, 'file', ctime, mtime, data.length, false);
-				console.log('defName in workflows', defname);	
+				this.pluginLogs.info('defName in workflows', defname);	
 				this.readDirectory(vscode.Uri.parse("wfm:/workflows/"));
 			} else { // here we update the workflow cache
 				this.workflows[name].ctime = Date.parse(entry.created_at);
@@ -902,18 +896,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/status';
 			response = await this._callNSP(url, {
 				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json',
-					'Cache-Control': 'no-cache',
-					'Authorization': 'Bearer ' + token
-				},
 				body: '{"status": "PUBLISHED"}'
 			});
 			if (!response) {
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			}
 
-			console.log("PUT", url, response.status);
+			this.pluginLogs.info("PUT", url, response.status);
 			if (!response.ok) {
 				throw vscode.FileSystemError.Unavailable('Change mode to PUBLISHED failed!');
 			}
@@ -921,7 +910,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
 			this.saveBackupLocally(name, data);
 		}
-		console.log('completed updating workflow');
+		this.pluginLogs.info('completed updating workflow');
 	}
 
 	/**
@@ -929,7 +918,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} name - name of the file to be deleted
 	*/
 	private async _deleteWorkflow(name: string): Promise<void> {
-		console.log('executing deleteWorkflow()');
+		this.pluginLogs.info('executing deleteWorkflow()');
 		
 		if (this.workflows[name+'.yaml'].signed) {
 			throw vscode.FileSystemError.NoPermissions('Unable to delete SIGNED workflows');
@@ -937,29 +926,17 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 		const id : string = this.workflows[name+'.yaml'].id;
 
-		// get auth-token
-		await this._getAuthToken();
-		const token = await this.authToken;
-		if (!token) {
-            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-        }
-
 		// change to DRAFT
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/status';
 		let response: any = await this._callNSP(url, {
 			method: 'PUT',
-			headers: {
-				'Content-Type': 'application/json',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
 			body: '{"status": "DRAFT"}'
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("PUT", url, response.status);
+		this.pluginLogs.info("PUT", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Change mode to DRAFT failed! Reason: '+response.statusText);
 		}
@@ -968,16 +945,12 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		// delete workflow
 		url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id;
 		response = await this._callNSP(url, {
-			method: 'DELETE',
-			headers: {
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			}
+			method: 'DELETE'
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
-		console.log("DELETE", url, response.status);
+		this.pluginLogs.info("DELETE", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Workflow deletion failed! Reason: '+response.statusText);
 		}
@@ -994,29 +967,19 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} data - data to be validated by NSP
 	 */
 	private async _validateWorkflow(data: string): Promise<void> {
-		console.log('executing _validateWorkflow()');
-		await this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-        }
+		this.pluginLogs.info('executing _validateWorkflow()');
 
 		// validate workflow definition
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/validate';
 		let response: any = await this._callNSP(url, {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'text/plain',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
 			body: data
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("POST", url, response.status);
+		this.pluginLogs.info("POST", url, response.status);
 		if (!response.ok) {
 			vscode.window.showErrorMessage('Workflow validation failed!');
 		} else {
@@ -1035,33 +998,23 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} data - data to be written to the file
 	 */
 	private async _writeWorkflowView(name: string, data: string): Promise<void> {
-		console.log('executing writeWorkflowView()');
+		this.pluginLogs.info('executing writeWorkflowView()');
 		
 		if (name.replace('.json', '.yaml') in this.workflows) { // We are modifying an existing workflow documentation (editor)
 			// make an api call to get the full view info and then update only the data attribute
 			let id = this.workflows[name.replace('.json', '.yaml')].id;
 			let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow/"+id+"/ui";
-			console.log('url: ', url);
-			
-			this._getAuthToken(); // get auth-token
-			const token = await this.authToken;
-			if (!token) {
-				throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-			}
+			this.pluginLogs.info('url: ', url);
 
 			let response: any = await this._callNSP(url, { // get workflow / action definition
-				method: 'GET',
-				headers: {
-					'Cache-Control': 'no-cache',
-					'Authorization': 'Bearer ' + token
-				}
+				method: 'GET'
 			});
 
 			if (!response){
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			}
 
-			console.log("GET", url, response.status);
+			this.pluginLogs.info("GET", url, response.status);
 			if (!response.ok) {
 				throw vscode.FileSystemError.FileNotFound('');
 			}
@@ -1079,31 +1032,20 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	*/
 	private async _updateWorkflowView(name: string, data: string): Promise<void> {
 
-		console.log('executing updateWorkflowView()');
+		this.pluginLogs.info('executing updateWorkflowView()');
 		const id = this.workflows[name].id;
-		await this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-		}
-		console.log("data: ", data);
-		// upload readme to workflow
-		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/ui';
-		console.log('url: ', url);
+		this.pluginLogs.info("data: ", data);
+		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/ui'; 
+		this.pluginLogs.info('url: ', url);
 		let response: any = await this._callNSP(url, {
 			method: 'PUT',
-			headers: {
-				'Content-Type': 'application/json',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
 			body: JSON.stringify(data)
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("PUT", url, response.status);
+		this.pluginLogs.info("PUT", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Workflow upload failed! Reason: '+response.statusText);
 		}
@@ -1112,13 +1054,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		// update workflow view cache
 		let json = await response.json();
 		let entry = json.response.data;
-		// Finish updating workflow views Cache - BELOW:
-		// const ctime = Date.parse(entry.created_at);
-		// const mtime = Date.parse(entry.updated_at);
-		// const size = data.length;
-		// this.workflow_views[name].ctime = ctime;
-		// this.workflow_views[name].mtime = mtime;
-		// this.workflow_views[name].size = size;
 		this.saveBackupLocally(name, data);
 	}
 
@@ -1128,7 +1063,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} data - data to be written to the file
 	 */
 	private async _writeWorkflow(name: string, data: string): Promise<void> {
-		console.log('executing writeWorkflow('+name+')');
+		this.pluginLogs.info('executing writeWorkflow('+name+')');
 		if (!name.endsWith('.yaml')) { // if the newName does not end with .yaml throw a vscode error and return
 			throw vscode.FileSystemError.NoPermissions('Workflow filename must end with .yaml');
 		} else {
@@ -1150,29 +1085,19 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	*/
 	private async _renameWorkflow(oldName: string, newName: string): Promise<void> {
 
-		console.log("executing renameWorkflow(" + oldName + ", " + newName + ")");
+		this.pluginLogs.info("executing renameWorkflow(" + oldName + ", " + newName + ")");
 		const yaml = require('yaml');
 		
-		await this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-        }
-
 		// get workflow definitions
 		let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow/"+oldName.replace('.yaml', '') +"/definition";
 		let response: any = await this._callNSP(url, {
-			method: 'GET',
-			headers: {
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			}
+			method: 'GET'
 		});
 
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
-		console.log("GET", url, response.status);
+		this.pluginLogs.info("GET", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.FileNotFound();
 		}
@@ -1190,29 +1115,19 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} data - data to be written to the file
 	*/
 	private async _createAction(data: string): Promise<void> {
-		console.log('executing createAction()');
-		await this._getAuthToken(); // get auth-token: 
-		const token = await this.authToken;
-		if (!token) {
-            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-        }
+		this.pluginLogs.info('executing createAction()');
 
 		// validate action definition
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/validate';
 		let response: any = await this._callNSP(url, {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'text/plain',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
 			body: data
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("POST", url, response.status);
+		this.pluginLogs.info("POST", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.NoPermissions('Action validation failed!');
 		}
@@ -1228,18 +1143,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/definition?provider=';
 		response = await this._callNSP(url, {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'text/plain',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
 			body: data
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("POST", url, response.status);
+		this.pluginLogs.info("POST", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Action creation failed! Reason: '+response.statusText);
 		}
@@ -1247,7 +1157,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 		json = await response.json();
 		const entry = json.response.data[0];
-
 		const name = entry.name + '.action';
 		const id = entry.id;
 		const ctime = Date.parse(entry.created_at);
@@ -1262,7 +1171,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} data - data to be written to the file
 	*/
 	private async _updateAction(name: string, data: string, rename: boolean): Promise<void> {
-		console.log('executing _updateAction()');
+		this.pluginLogs.info('executing _updateAction()');
 
 		const yaml = require('yaml');
 		let defname = Object.keys(yaml.parse(data)).filter((value) => value !== "version")[0] + '.action';
@@ -1270,7 +1179,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			if (Object.keys(this.actions).indexOf(defname)=== -1) { // if the  name is not in the actions
 				vscode.window.showInformationMessage('Action Name changed, creating copy of action.');
 				await this._createAction(data);
-				console.log(vscode.Uri.parse("wfm:/actions/" + defname));
 				let txtdoc = await vscode.workspace.openTextDocument( vscode.Uri.parse("wfm:/actions/" + defname));
 				vscode.window.showTextDocument(txtdoc);
 			} else {
@@ -1280,28 +1188,18 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			vscode.window.showErrorMessage("Unable to save SIGNED Action. To create a copy, modify the name in the definition.");
 		} else { // if we need to rename or were just updating
 			const id = this.actions[name].id;
-			await this._getAuthToken(); // get auth-token
-			const token = await this.authToken;
-			if (!token) {
-				throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-			}
 
 			// validate action definition
 			let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/validate';
 			let response: any = await this._callNSP(url, {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'text/plain',
-					'Cache-Control': 'no-cache',
-					'Authorization': 'Bearer ' + token
-				},
 				body: data
 			});
 			if (!response){
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			}
 
-			console.log("POST", url, response.status);
+			this.pluginLogs.info("POST", url, response.status);
 			if (!response.ok) {
 				throw vscode.FileSystemError.NoPermissions('Action validation failed!');
 			}
@@ -1317,18 +1215,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/'+id+'/definition';
 			response = await this._callNSP(url, {
 				method: 'PUT',
-				headers: {
-					'Content-Type': 'text/plain',
-					'Cache-Control': 'no-cache',
-					'Authorization': 'Bearer ' + token
-				},
 				body: data
 			});
 			if (!response){
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			}
 
-			console.log("PUT", url, response.status);
+			this.pluginLogs.info("PUT", url, response.status);
 			if (!response.ok) {
 				throw vscode.FileSystemError.Unavailable('Action upload failed! Reason: '+response.statusText);
 			}
@@ -1359,28 +1252,19 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} name - name of the file to be deleted
 	*/
 	private async _deleteAction(name: string): Promise<void> {
-		console.log('executing deleteAction(+name+)', name);
+		this.pluginLogs.info('executing deleteAction(+name+)', name);
 		const id : string = this.actions[name].id;
-		await this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-        }
 
 		// delete action
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/'+id;
 		let response: any = await this._callNSP(url, {
-			method: 'DELETE',
-			headers: {
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			}
+			method: 'DELETE'
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("DELETE", url, response.status);
+		this.pluginLogs.info("DELETE", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Action deletion failed! Reason: '+response.statusText);
 		}
@@ -1393,31 +1277,19 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} data - data to be validated by NSP
 	*/
 	private async _validateAction(data: string): Promise<void> {
-
-		console.log('executing _validateAction()');
-		// get auth-token
-		await this._getAuthToken();
-		const token = await this.authToken;
-		if (!token) {
-            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-        }
+		this.pluginLogs.info('executing _validateAction()');
 
 		// validate action definition
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action/validate';
 		let response: any = await this._callNSP(url, {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'text/plain',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			},
 			body: data
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("POST", url, response.status);
+		this.pluginLogs.info("POST", url, response.status);
 		if (!response.ok) {
 			vscode.window.showErrorMessage('Action validation failed!');
 		} else {
@@ -1436,7 +1308,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} data - data to be written to the file
 	*/
 	private async _writeAction(name: string, data: string): Promise<void> {
-		console.log('executing _writeAction()');
+		this.pluginLogs.info('executing _writeAction()');
 		if (!name.endsWith('.action')) { // if the newName does not end with .yaml throw a vscode error and return
 			throw vscode.FileSystemError.NoPermissions('Action filename must end with .action');
 		} else{
@@ -1457,29 +1329,19 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {string} newName - new name of the file
 	*/
 	private async _renameAction(oldName: string, newName: string): Promise<void> {
-		console.log('executing renameAction()');
+		this.pluginLogs.info('executing renameAction()');
 		const yaml = require('yaml');
-
-		await this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-        }
 
 		// get action definitions
 		let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/action/"+oldName.replace('.action','')+"/definition";
 		let response: any = await this._callNSP(url, {
-			method: 'GET',
-			headers: {
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			}
+			method: 'GET'
 		});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("GET", url, response.status);
+		this.pluginLogs.info("GET", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.FileNotFound();
 		}
@@ -1503,12 +1365,12 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {vscode.WebviewPanel} panel - webview panel
 	*/
 	private async _getWebviewContent(wfnm: string, exectime: string,execstat: string,execid: string,state_info: string,panel: vscode.WebviewPanel): Promise<string> {
-		console.log('executing _getWebviewContent()');
+		this.pluginLogs.info('executing _getWebviewContent()');
 
 		const isNSPVersion2311 = this._fromRelease(23, 11);
 		const nspAddr = this.nspAddr;
 		const port = this.port;
-		console.log('isNSPVersion2311: ', isNSPVersion2311);
+		this.pluginLogs.info('isNSPVersion2311: ', isNSPVersion2311);
 		const extURI = this.extContext.extensionUri;
 		const onDiskPath = vscode.Uri.joinPath(extURI, 'media', 'noklogo_black.svg');
 		const catGifSrc = panel.webview.asWebviewUri(onDiskPath);
@@ -1557,7 +1419,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 			html=html+`</div></section>`;
 			i=i+1;
-			console.log(JSON.stringify(publish, undefined, 4));
+			this.pluginLogs.info(JSON.stringify(publish, undefined, 4));
 		});
 		html=html+`</body></html>`;
 		return html;
@@ -1568,7 +1430,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	*/
 	async validate(): Promise<void> {
 
-		console.log("Executing validate()");
+		this.pluginLogs.info("Executing validate()");
 		const YAML = require('yaml')
 		const editor = vscode.window.activeTextEditor;
 
@@ -1597,7 +1459,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Works with NSP New Navigation (since 23.11)
 	*/
 	async openInBrowser(): Promise<void> { // async function to open the workflow in the browser
-		console.log("Executing openInBrowser()");
+		this.pluginLogs.info("Executing openInBrowser()");
 		const YAML = require('yaml')
 		const editor = vscode.window.activeTextEditor; // gets the active file that the user is in.
 
@@ -1647,7 +1509,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				let key = Object.keys(doc).filter((value) => value !== "version")[0];
 				if ('base-input' in doc[key]) {
 					if (Object.keys(this.actions).length === 0) {
-						console.log(vscode.Uri.parse('wfm:/actions'))
 						await this.readDirectory(vscode.Uri.parse('wfm:/actions'));
 					}
 					if (key in this.actions) {
@@ -1665,7 +1526,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					}
 				} else {
 					if (Object.keys(this.workflows).length === 0) {
-						console.log(vscode.Uri.parse('wfm:/workflows'))
 						await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
 					}		
 					if (key in this.workflows) {
@@ -1690,10 +1550,11 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to apply JSON schema to the active text editor
 	*/
 	async applySchema(): Promise<void>{ // applySchema returns a promise of void
-		console.log("Executing applySchema()");
+		this.pluginLogs.info("Executing applySchema()");
 		const editor = vscode.window.activeTextEditor; // get the active text editor
 		const extURI = this.extContext.extensionUri;
 		let outpath = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema.json').toString().replace("file://","");
+		this.pluginLogs.info("outpath: ", outpath);
 		if (editor) {
 			const document = editor.document;
 			const wfmSchema = outpath;
@@ -1718,7 +1579,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to execute a workflow in WFM
 	*/
 	async execute(): Promise<void>{
-		console.log('executing execute()');
+		this.pluginLogs.info('executing execute()');
 		const YAML = require('yaml')
 		const editor = vscode.window.activeTextEditor;
 		if (editor) {
@@ -1808,7 +1669,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to execute the last workflow in WFM
 	*/
 	async lastResult(): Promise<void> {
-		console.log('executing lastResult()');
+		this.pluginLogs.info('executing lastResult()');
 		const YAML = require('yaml');
 		const fetch = require('node-fetch');
 
@@ -1849,7 +1710,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			var path = require('path');
 			vscode.window.showInformationMessage('Last execution info:'+exectime+"\nwith status: "+execstat,"See in WFM","Details","Cancel").then( async (selectedItem) => {
 				if ('Details' === selectedItem) { //Beta
-					console.log(path.join(this.extContext.extensionPath, 'media'));
+					this.pluginLogs.info(path.join(this.extContext.extensionPath, 'media'));
 					const panel = vscode.window.createWebviewPanel(
 						'executionReport',
 						wfnm+' Execution',
@@ -1873,7 +1734,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to upload the active file to NSP
 	*/
 	async upload(): Promise<void> {
-		console.log('executing upload()');
+		this.pluginLogs.info('executing upload()');
 		const YAML = require('yaml')
 		const editor = vscode.window.activeTextEditor;
 
@@ -1893,7 +1754,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to generate the workflow manager schema and snippets
 	*/
 	async generateSchema(): Promise<void> {
-		console.log('executing generateSchema()');
+		this.pluginLogs.info('executing generateSchema()');
 		let data;
 		await this._getAuthToken(); // get auth-token
 		const token = await this.authToken;
@@ -1905,7 +1766,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		let config = vscode.workspace.getConfiguration('workflowManager');
 		const extURI = this.extContext.extensionUri;
 		let templatePath = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema-builder.json.j2').toString().replace("file://","");
+		this.pluginLogs.info("templatePath: ", templatePath);
 		let outpath = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema.json').toString().replace("file://","");
+		this.pluginLogs.info("outpath: ", outpath);
 		let snippetsfile = vscode.Uri.joinPath(extURI, 'schema', 'snippets.json').toString().replace("file://","");
 		let snippets:JSON={} as JSON;
 		let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/action";
@@ -1920,32 +1783,28 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (!wfm_response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
-
+		this.pluginLogs.info('data: ', wfm_response);
 		data = await wfm_response.json();	
-		console.log('actions: ', data.response.data);	
 		let actions = data.response.data;
 		let entries: any = {};
-		
 		entries["actions"] = [];
 		const YAML = require('yaml');
 		const ny = require('nunjucks');
 		let actionlist = []; // used to store a list of actions
+		this.pluginLogs.info('actions: ', actions);
 		actions.forEach(function(action) {
 			let entry: any = {};
 			try {
 				let ym = YAML.parse(action.description);
 				entry["name"]=action.name;
-				console.log('action.name: ', action.name);
 				if (Object.keys(ym).includes("examples")){ // if the action has examples
 					const ex1 = Object.keys(ym.examples)[0];
 					snippets[ym.action]={"scope":"yaml","prefix":ym.action,"description":ex1,"body":[ym.examples[ex1]]};
 				}
 				entry["description"] = ym.short_description.replace("\n", " ").trim(); // parse for the workflow description
 				entry["properties"] = ym.input; // parse for the workflow properties
-				console.log('properties: ', ym.input);
 
 				Object.keys(entry.properties).forEach(function (arg){ // loop through each property
-					console.log('arg: ', arg);
 					if (Object.keys(entry.properties[arg]).indexOf("description") !== -1) { // if the argument has a description
 						var auxi = entry.properties[arg]["description"].split("\n")[0]; // get the first line of the description
 						entry.properties[arg]["description"] = auxi; // set the description to the first line
@@ -1979,7 +1838,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 			if (entry.name === "nsp.https") { // if the action is nsp.https allow the body type to be any type:
 				entry.properties["body"]["type"] = {"type": ["string", "object", "array", "null"]};
-				console.log('entry.properties["body"]: ', entry.properties["body"]);
 			}
 			if (entry.name === "std.echo") { // if the action is std.echo allow the output type to be any type:
 				entry.properties["output"]["type"] = {"type": ["string", "object", "null"]};
@@ -1997,22 +1855,22 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				actionlist.push(entry.name); // add the action to the list of actions
 			}
 		});
-
+		this.pluginLogs.info('entries: ', entries);
 		var res = ny.render(templatePath, entries); // render the template with the entries
 		let fs = require("fs");
+		this.pluginLogs.info('res: ', res);
 		fs.writeFile(outpath, res, (err) => { 
 			if(err) { 
-				console.log(err); 
+				this.pluginLogs.error(err);
 			}
 		});
 
 		fs.writeFile(snippetsfile, JSON.stringify(snippets,null,'\t'), (err) => { 
 			if(err) { 
-				console.log(err); 
+				this.pluginLogs.error(err);
 			}
 		});
 
-		console.log('schema generated');
 		const wfmSchema = outpath; // get the path to the schema
 		const workflowUri = "wfm:/workflows/*/*"; // get the uri for the workflow
 		let schemas = vscode.workspace.getConfiguration('yaml').get('schemas'); // get the schemas from the workspace
@@ -2029,6 +1887,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		} else {
 			schemas[wfmSchema] = workflowUri; // set the schema to the workflow uri
 		}
+		this.pluginLogs.info('schemas: ', schemas);
 		vscode.workspace.getConfiguration('yaml').update('schemas', schemas); // update the schemas
 	}
 
@@ -2185,51 +2044,51 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			if (typeof input[i] === 'object') {
 				Object.keys(input[i]).forEach(function (key) {
 				if (key === 'token_auth') {
-					// console.log('ignore token_auth')
+					// this.pluginLogs.info('ignore token_auth')
 				} else if (typeof input[i][key] === 'string') {
-					// console.log('string or password')
+					// this.pluginLogs.info('string or password')
 					properties.push(uiText(key, input[i][key]))
 				} else if (typeof input[i][key] === 'number') {
-					// console.log('number')
+					// this.pluginLogs.info('number')
 					properties.push(uiNumber(key, input[i][key]))
 				} else if (typeof input[i][key] === 'boolean') {
-					// console.log('boolean')
+					// this.pluginLogs.info('boolean')
 					properties.push(uiBoolean(key, input[i][key]))
 				} else if (
 					typeof input[i][key] === 'object' &&
 					input[i][key] !== null
 				) {
 					if (input[i][key].length > 0) {
-					// console.log('list becomes enum')
+					// this.pluginLogs.info('list becomes enum')
 					properties.push(uiEnum(key, input[i][key]))
 					} else {
-					// console.log('list is list')
+					// this.pluginLogs.info('list is list')
 					properties.push(uiList(key))
 					}
 				} else {
 					// unsupported object
-					// console.log('obj/list not supported')
+					// this.pluginLogs.info('obj/list not supported')
 				}
 				})
 			} else if (typeof input[i] === 'string') {
 				let key = input[i]
 				if (['neId', 'neName', 'mgmtIP'].includes(key)) {
-				// console.log('neList: ', key)
+				// this.pluginLogs.info('neList: ', key)
 				properties.push(uiSuggest(key, 'nspWebUI.neList', key))
 				} else if (key === 'port') {
-				// console.log('port')
+				// this.pluginLogs.info('port')
 				properties.push(uiSuggest(key, 'nspWebUI.portList', 'name'))
 				} else if (key === 'workflow') {
-				// console.log('workflow')
+				// this.pluginLogs.info('workflow')
 				properties.push(uiSuggest(key, 'nspWebUI.wfList', 'name'))
 				} else if (key === 'intentType') {
-				// console.log('intentType')
+				// this.pluginLogs.info('intentType')
 				properties.push(uiSuggest(key, 'nspWebUI.intentTypeList', 'name'))
 				} else if (key === 'intent') {
-				// console.log('intent')
+				// this.pluginLogs.info('intent')
 				properties.push(uiSuggest(key, 'nspWebUI.intentList', 'target'))
 				} else if (key === 'nodes') {
-				// console.log('nodes')
+				// this.pluginLogs.info('nodes')
 				properties.push(
 					uiSelectPaged(
 					key,
@@ -2238,7 +2097,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					)
 				)
 				} else if (key === 'ports') {
-				// console.log('ports')
+				// this.pluginLogs.info('ports')
 				properties.push(
 					uiSelectPaged(
 					key,
@@ -2247,12 +2106,12 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					)
 				) // eslint-disable-line max-len
 				} else if (key === 'workflows') {
-				// console.log('workflows')
+				// this.pluginLogs.info('workflows')
 				properties.push(
 					uiSelect(key, 'nspWebUI.wfList', 'name,createBy,modifiedBy')
 				)
 				} else if (key === 'intentTypes') {
-				// console.log('intentTypes')
+				// this.pluginLogs.info('intentTypes')
 				properties.push(
 					uiSelect(
 					key,
@@ -2261,17 +2120,17 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					)
 				)
 				} else if (key === 'token_auth') {
-				// console.log('ignore token_auth')
+				// this.pluginLogs.info('ignore token_auth')
 				} else {
-				// console.log('string or password')
+				// this.pluginLogs.info('string or password')
 				properties.push(uiText(input[i], ''))
 				}
 			} else {
-				// console.log(input[i] + ': ' + typeof input[i])
+				// this.pluginLogs.info(input[i] + ': ' + typeof input[i])
 			}
 			} // end-for
 		} catch (e) {
-			// console.log(JSON.stringify(e, null, 2))
+			this.pluginLogs.error(JSON.stringify(e, null, 2));
 		} // end-try
 
   		let uijson = { type: 'object', properties: properties }
@@ -2289,11 +2148,11 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {vscode.Uri} uri URI of the folder to retrieve from NSP
 	 */	
 	async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
-		console.log("executing readDirectory("+uri.toString()+")");
+		this.pluginLogs.info("executing readDirectory("+uri.toString()+")");
 		let url = undefined;
 
 		if (!this.nspVersion) {
-			await this._getNSPversion(); // get the version of the NSP
+			this._getNSPversion(); // get the version of the NSP
 		}
 
 		if (uri.toString() === "wfm:/") { // if root
@@ -2309,27 +2168,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		} else {
 			throw vscode.FileSystemError.FileNotADirectory('Unknown Resource!');
 		}
-
-		await this._getAuthToken(); // get auth-token
-		const token = await this.authToken;
-		if (!token) {
-            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
-        }
 		
-		let response: any = await this._callNSP(url, { // get list of all workflow or action definitions
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			}
-		});
-
+		let response: any = await this._callNSP(url, {method: 'GET'});
 		if (!response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
-		console.log("GET", url, response.status);
+		this.pluginLogs.info("GET", url, response.status);
 		if (!response.ok) {
 			throw vscode.FileSystemError.Unavailable('Cannot get workflow list');
 		}
@@ -2384,7 +2229,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		} else if (uri.toString() === "wfm:/actions") {
 			var result: [string, vscode.FileType][] = (filteredList ?? []).map(entry => [entry.name + '.action', vscode.FileType.File] as [string, vscode.FileType]);			
 		} else if (uri.toString() === "wfm:/templates") {
-			console.log('URI: wfm:/templates')
+			this.pluginLogs.info('URI: wfm:/templates')
 			var result: [string, vscode.FileType][] = (filteredList ?? []).map(entry => [entry.name + '.jinja', vscode.FileType.File] as [string, vscode.FileType]);			
 		} else if (uri.toString().startsWith("wfm:/workflows/")) { // returns a workflow folder
 			let curr_workflow_name = uri.toString().substring(15);
@@ -2393,101 +2238,105 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		return result;
 	}
 
-/**
+	/**
 	 * vsCode.FileSystemProvider method to get details/metadata about files and folders.
 	 * Returns type (file/directory), timestamps (create/modify), file size,
 	 * and access permissions (read/write).
 	 * @param {vscode.Uri} uri URI of the folder to retrieve from NSP
 	 */	
-async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
-	console.log('executing stat('+uri+')');
+	async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
+		this.pluginLogs.info('executing stat('+uri+')');
 
-	if (uri.toString().endsWith('.')) {
+		const path = uri.toString();
+		if (path.endsWith('.')) {
+			throw vscode.FileSystemError.FileNotFound('No Permissions!');
+		}
+		
+		if ((path ==='wfm:/') || (path==='wfm:/workflows') || (path==='wfm:/actions') || (path==='wfm:/templates')) {
+			return {
+				type: vscode.FileType.Directory,
+				ctime: 0,
+				mtime: Date.now(),
+				size: 0,
+				permissions: vscode.FilePermission.Readonly
+			};
+		}
+
+		let path_length = path.split('/').length;
+		if (path.startsWith('wfm:/workflows/') && path_length > 3 && !(path.endsWith('.yaml') || path.endsWith('.json') || path.endsWith('.md'))) {
+			this.pluginLogs.error("No Permission to add a folder/file within a workflow folder!");
+			throw vscode.FileSystemError.FileNotFound('No Permission to add a folder/file within a workflow folder!');
+		}
+		
+		else if (path.startsWith('wfm:/workflows/') && !(path.endsWith('.yaml') || path.endsWith('.json') || path.endsWith('.md'))) { // if the uri is a workflow folder
+			if (Object.keys(this.workflow_folders).length === 0) { // if the workflows cache is empty:
+				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
+			}
+			const key = path.split('/')[2];
+			if (key in this.workflow_folders) {
+				return this.workflow_folders[key];
+			}
+			this.pluginLogs.error("Unkown Workflow!");
+			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
+		} else if (path.startsWith('wfm:/workflows/') && path.endsWith('.yaml')) {
+			if (Object.keys(this.workflows).length === 0) { // if the workflows are empty
+				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
+			}
+			const key = path.split('/')[3];
+			if (key in this.workflows) {
+				return this.workflows[key];
+			}
+			this.pluginLogs.error("Unkown Workflow!");
+			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
+		} else if (path.startsWith('wfm:/workflows/') && path.endsWith('.md')) {
+			if (Object.keys(this.workflows).length === 0) {
+				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
+			}
+			if (!(path.split('/')[3] === 'README.md')) { // if user attempts to rename the workflow doc to other than README.md
+				return; // returning here will prompt the error checking in rename:
+			}
+			const key = path.split('/')[2] + '.md';
+			if (key in this.workflow_documentations) {
+				return this.workflow_documentations[key];
+			}
+			this.pluginLogs.error("Unkown Workflow!");
+			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
+		} else if (path.startsWith('wfm:/workflows/') && path.endsWith('.json')) {
+			if (Object.keys(this.workflows).length === 0) {
+				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
+			}
+			const key = path.split('/')[3];
+			if (key in this.workflow_views) {
+				return this.workflow_views[key];
+			}
+			this.pluginLogs.error("Unkown Workflow!");
+			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
+		}
+		
+		if (path.startsWith('wfm:/actions/')) {
+			if (Object.keys(this.actions).length === 0) {
+				await this.readDirectory(vscode.Uri.parse('wfm:/actions'));
+			}
+			const key = path.substring(13); // get the key of the action
+			if (key in this.actions) {
+				return this.actions[key];
+			}
+			this.pluginLogs.error("Unkown Action!");
+			throw vscode.FileSystemError.FileNotFound('Unknown action!');
+		} else if(path.startsWith('wfm:/templates/')) {
+			if (Object.keys(this.templates).length === 0) {
+				await this.readDirectory(vscode.Uri.parse('wfm:/templates'));
+			}
+			const key = path.substring(15); // get the key of the action
+			if (key in this.templates) {
+				return this.templates[key];
+			}
+			this.pluginLogs.error("Unkown Template!");
+			throw vscode.FileSystemError.FileNotFound('Unknown template!');
+		}
+		this.pluginLogs.error("No Permissions!");
 		throw vscode.FileSystemError.FileNotFound('No Permissions!');
 	}
-	
-	if ((uri.toString() ==='wfm:/') || (uri.toString()==='wfm:/workflows') || (uri.toString()==='wfm:/actions') || (uri.toString()==='wfm:/templates')) {
-		return {
-			type: vscode.FileType.Directory,
-			ctime: 0,
-			mtime: Date.now(),
-			size: 0,
-			permissions: vscode.FilePermission.Readonly
-		};
-	}
-
-	let path_length = uri.toString().split('/').length;
-	if (uri.toString().startsWith('wfm:/workflows/') && path_length > 3 && !(uri.toString().endsWith('.yaml') || uri.toString().endsWith('.json') || uri.toString().endsWith('.md'))) {
-		throw vscode.FileSystemError.FileNotFound('No Permission to add a folder/file within a workflow folder!');
-	}
-	
-	else if (uri.toString().startsWith('wfm:/workflows/') && !(uri.toString().endsWith('.yaml') || uri.toString().endsWith('.json') || uri.toString().endsWith('.md'))) { // if the uri is a workflow folder
-		if (Object.keys(this.workflow_folders).length === 0) { // if the workflows are empty
-			await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
-		}
-		const key = uri.toString().split('/')[2];
-		console.log('key1: ', key);
-		if (key in this.workflow_folders) {
-			return this.workflow_folders[key];
-		}
-		throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
-	} else if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().endsWith('.yaml')) {
-		if (Object.keys(this.workflows).length === 0) { // if the workflows are empty
-			await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
-		}
-		const key = uri.toString().split('/')[3];
-		console.log('key2: ', key);
-		if (key in this.workflows) {
-			return this.workflows[key];
-		}
-		throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
-	} else if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().endsWith('.md')) {
-		if (Object.keys(this.workflows).length === 0) {
-			await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
-		}
-		if (!(uri.toString().split('/')[3] === 'README.md')) { // if user attempts to rename the workflow doc to other than README.md
-			return; // returning here will prompt the error checking in rename:
-		}
-		const key = uri.toString().split('/')[2] + '.md';
-		if (key in this.workflow_documentations) {
-			return this.workflow_documentations[key];
-		}
-		throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
-	} else if (uri.toString().startsWith('wfm:/workflows/') && uri.toString().endsWith('.json')) {
-		if (Object.keys(this.workflows).length === 0) {
-			await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
-		}
-		const key = uri.toString().split('/')[3];
-		console.log('key4: ', key);
-		if (key in this.workflow_views) {
-			return this.workflow_views[key];
-		}
-		throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
-	}
-	
-	if (uri.toString().startsWith('wfm:/actions/')) {
-		if (Object.keys(this.actions).length === 0) {
-			console.log(vscode.Uri.parse('wfm:/actions'))
-			await this.readDirectory(vscode.Uri.parse('wfm:/actions'));
-		}
-		const key = uri.toString().substring(13); // get the key of the action
-		if (key in this.actions) {
-			return this.actions[key];
-		}
-		throw vscode.FileSystemError.FileNotFound('Unknown action!');
-	} else if(uri.toString().startsWith('wfm:/templates/')) {
-		if (Object.keys(this.templates).length === 0) {
-			console.log(vscode.Uri.parse('wfm:/templates'))
-			await this.readDirectory(vscode.Uri.parse('wfm:/templates'));
-		}
-		const key = uri.toString().substring(15); // get the key of the action
-		if (key in this.templates) {
-			return this.templates[key];
-		}
-		throw vscode.FileSystemError.FileNotFound('Unknown template!');
-	}
-	throw vscode.FileSystemError.FileNotFound('No Permissions!');
-}
 
 	/**
 	 * vsCode.FileSystemProvider method to read file content into an editor window.
@@ -2496,7 +2345,7 @@ async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 	 * @param {vscode.Uri} uri URI of the folder to retrieve from NSP
 	*/
 	async readFile(uri: vscode.Uri): Promise<Uint8Array> { // VsCode readFile function: returns the file content of the file
-		console.log('executing readFile('+uri.toString()+')');
+		this.pluginLogs.info('executing readFile('+uri.toString()+')');
 		let url = undefined;
 		if (uri.toString().startsWith("wfm:/actions/")) {
 			let id = uri.toString().substring(13).replace('.action', '');
@@ -2526,11 +2375,7 @@ async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
         }
 
 		let response: any = await this._callNSP(url, { // get either workflow/action/template definition
-			method: 'GET',
-			headers: {
-				'Cache-Control': 'no-cache',
-				'Authorization': 'Bearer ' + token
-			}
+			method: 'GET'
 		});
 
 		if (!response){
@@ -2543,7 +2388,7 @@ async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 
 		let text = await response.text();
 		if (uri.toString().startsWith("wfm:/templates/")) { // if we are in the templates directory
-			console.log('URI: wfm:/templates');
+			this.pluginLogs.info('URI: wfm:/templates');
 			const yaml = require('yaml');
 			const doc = yaml.parse(text);
 			return Buffer.from(doc.template); // return only the template buffer
@@ -2579,30 +2424,30 @@ async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 	 * @param {Object} options allow/enforce to create/overwrite
 	 */
 	async writeFile(uri: vscode.Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): Promise<void> {
-		console.log("executing writeFile("+uri+")");
+		this.pluginLogs.info("executing writeFile("+uri+")");
 		
 		if (uri.toString().startsWith('wfm:/workflows/')) {
 			if (uri.toString().endsWith('.json')) { // if its a view
 				const key = uri.toString().substring(15).split('/').pop();
-				console.log('key: ', key);
-				console.log('content: ', content.toString());
+				this.pluginLogs.info('key: ', key);
+				this.pluginLogs.info('content: ', content.toString());
 				await this._writeWorkflowView(key, content.toString());
 			} else if (uri.toString().endsWith('.yaml')) { // if its yaml def or readme
 				const key = uri.toString().substring(15).split('/').pop();
-				console.log('key: ', key);
-				console.log('content: ', content.toString());
+				this.pluginLogs.info('key: ', key);
+				this.pluginLogs.info('content: ', content.toString());
 				await this._writeWorkflow(key, content.toString());
 			} else if (uri.toString().endsWith('.md')) { // if its a readme
-				console.log('content: ', content.toString());
+				this.pluginLogs.info('content: ', content.toString());
 				await this._writeWorkflowDocumentation(uri, content.toString());
 			}
 		} else if (uri.toString().startsWith('wfm:/actions/')) {
 			const key = uri.toString().substring(13);
-			console.log('content: ', content.toString());
+			this.pluginLogs.info('content: ', content.toString());
 			await this._writeAction(key, content.toString());
 		} else if (uri.toString().startsWith('wfm:/templates/')) {
 			const key = uri.toString().substring(15);
-			console.log('content: ', content.toString());
+			this.pluginLogs.info('content: ', content.toString());
 			await this._writeTemplate(key, content.toString());
 		} else {
 			throw vscode.FileSystemError.FileNotFound('Unknown resource-type!');
@@ -2616,14 +2461,18 @@ async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 	 * @param {{overwrite: boolean}} options additional options
 	*/	
 	async rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { overwrite: boolean }): Promise<void> {
-		console.log("executing rename("+oldUri+", "+newUri+")");
+		this.pluginLogs.info("executing rename("+oldUri+", "+newUri+")");
+
 		if (oldUri.toString().endsWith('.') || newUri.toString().endsWith('.')) {
+			this.pluginLogs.error('No Permissions!')
 			throw vscode.FileSystemError.NoPermissions('No Permissions!');
 		}
 		if (oldUri.toString().startsWith('wfm:/workflows/') && newUri.toString().includes('.md')) {
+			this.pluginLogs.error('No Permissions!')
 			throw vscode.FileSystemError.NoPermissions('No Permissions!');
 		}
 		if (oldUri.toString().startsWith('wfm:/workflows/') && newUri.toString().endsWith('.json') || newUri.toString().endsWith('.yaml')) {
+			this.pluginLogs.error('No Permissions!')
 			throw vscode.FileSystemError.NoPermissions('Must rename the workflow folder!');
 		}
 		if (oldUri.toString().startsWith('wfm:/workflows/') && newUri.toString().startsWith('wfm:/workflows/')) {
@@ -2655,32 +2504,40 @@ async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 		}
 	}
 
+
 	/**
 	 * vsCode.FileSystemProvider method to delete files in  NSP virtual filesystem
 	 * for Workflow Manager. Support intent-types, intents and views.
 	 * @param {vscode.Uri} uri URI of the file to delete
 	*/	
 	async delete(uri: vscode.Uri): Promise<void> {
-		console.log("executing delete("+uri+")");
-		if (uri.toString() === "wfm:/workflows") { // no permissions to delete a directory
+		this.pluginLogs.info("executing delete("+uri+")");
+
+		const path = uri.toString();
+		if (path === "wfm:/workflows") { // no permissions to delete a directory
+			this.pluginLogs.error("Cannot Delete Directory");
 			throw vscode.FileSystemError.NoPermissions('Permission denied!');
-		} else if (uri.toString() === "wfm:/actions") {
+		} else if (path === "wfm:/actions") {
+			this.pluginLogs.error("Cannot Delete Directory");
 			throw vscode.FileSystemError.NoPermissions('Permission denied!');
-		} else if (uri.toString() === "wfm/templates") {
+		} else if (path === "wfm/templates") {
+			this.pluginLogs.error("Cannot Delete Directory");
 			throw vscode.FileSystemError.NoPermissions('Permission denied!');
-		} else if (uri.toString().startsWith("wfm:/workflows/") && !(uri.toString().endsWith('.json') || uri.toString().endsWith('.yaml') || uri.toString().endsWith('.md'))) {
-			let key = uri.toString().substring(15);
+		} else if (path.startsWith("wfm:/workflows/") && !(path.endsWith('.json') || path.endsWith('.yaml') || path.endsWith('.md'))) {
+			let key = path.substring(15);
 			await this._deleteWorkflow(key);
-		} else if (uri.toString().startsWith("wfm:/workflows/") && (uri.toString().endsWith('.json') || uri.toString().endsWith('.yaml') || uri.toString().endsWith('.md'))) {
-			let folder_name = uri.toString().split("/").pop().split(".")[0];
+		} else if (path.startsWith("wfm:/workflows/") && (path.endsWith('.json') || path.endsWith('.yaml') || path.endsWith('.md'))) {
+			let folder_name = path.split("/").pop().split(".")[0];
+			this.pluginLogs.error("Permission denied! Must delete the '+folder_name+' workflow folder!");
 			throw vscode.FileSystemError.NoPermissions('Permission denied! Must delete the '+folder_name+' workflow folder!');
-		} else if (uri.toString().startsWith("wfm:/actions/")) {
-			let key = uri.toString().substring(13);
+		} else if (path.startsWith("wfm:/actions/")) {
+			let key = path.substring(13);
 			await this._deleteAction(key);
-		} else if (uri.toString().startsWith("wfm:/templates/")) {
-			let key = uri.toString().substring(15);
+		} else if (path.startsWith("wfm:/templates/")) {
+			let key = path.substring(15);
 			await this._deleteTemplate(key);
 		} else {
+			this.pluginLogs.error("No Permissions to delete (' + uri +  ')!");
 			throw vscode.FileSystemError.FileNotFound('No Permissions to delete (' + uri +  ')!');
 		}
 	}
@@ -2690,7 +2547,7 @@ async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 	 * @param {vscode.Uri} uri URI of the folder to be created
 	*/	
 	createDirectory(uri: vscode.Uri): void {
-		console.log("executing createDirectory("+uri+")");
+		this.pluginLogs.info("executing createDirectory("+uri+")");
 		if (uri.toString().endsWith('.')) {
 			throw vscode.FileSystemError.NoPermissions('No Permissions!');
 		}
@@ -2711,16 +2568,16 @@ async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 	saveBackupLocally(name: string, data: string): void {
 		if (this.localsave===true) {
 			let fs = require("fs");
-			console.log("Saving a backup locally in the temp folder "+this.localpath);
+			this.pluginLogs.info("Saving a backup locally in the temp folder "+this.localpath);
 			let extURI = vscode.Uri.parse("file://"+this.localpath);
 			let filepath = vscode.Uri.joinPath(extURI, name).toString().replace("file://","");
-			console.log('filepath: ', filepath);
-			console.log('extURI', extURI);
+			this.pluginLogs.info('filepath: ', filepath);
+			this.pluginLogs.info('extURI', extURI);
 			fs.writeFile(filepath, data, (err) => {
 				if(err) {
-					console.log(err); 
+					this.pluginLogs.error(err); 
 				}
-				console.log("Successfully saved in local repo."); 
+				this.pluginLogs.info("Successfully saved in local repo."); 
 			});
 		}
 	}
@@ -2732,10 +2589,21 @@ async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 	 * @param {vscode.Uri} uri URI of the folder to retrieve from NSP
 	 */	
 	public provideFileDecoration( uri: vscode.Uri): vscode.ProviderResult<vscode.FileDecoration> {
-		console.log('executing provideFileDecoration()');
+		this.pluginLogs.info('executing provideFileDecoration()');
+		if (uri.toString() === 'wfm:/') {
+			this.pluginLogs.debug("provideFileDecoration(wfm:/)");
+			if (this.nspVersion) {
+				DECORATION_CONNECTED.tooltip = "Connected to "+this.username+"@"+this.nspAddr+" (Release: "+this.nspVersion+")";
+				DECORATION_DISCONNECTED.tooltip = "Not connected!"; // revert to original text
+				return DECORATION_CONNECTED;
+			} else {
+				return DECORATION_DISCONNECTED;
+			}
+		}
+		
 		if (uri.toString().startsWith('wfm:/workflows/')) {
 			const key = uri.toString().substring(15);
-			console.log('key: ', key);
+			this.pluginLogs.info('key: ', key);
 			if (this.workflows[key+'.yaml'].signed) return DECORATION_SIGNED;
 			return DECORATION_UNSIGNED;
 		} else if (uri.toString().startsWith('wfm:/actions/')) {
@@ -2744,6 +2612,46 @@ async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 			return DECORATION_UNSIGNED;
 		}
 	}	
+
+	/**
+	 * Update WorkflowManagerProvider after configuration changes 
+	*/	
+	public async updateSettings() {
+		this.pluginLogs.info("Executing updateSettings()");
+
+		const config = vscode.workspace.getConfiguration('workflowManager');
+		this.timeout = config.get('timeout') ?? 90000; // default 3min
+		this.fileIgnore = config.get('ignoreTags') ?? [];
+		this.localsave = config.get("localStorage.enable") ?? false;
+		this.localpath = config.get("localStorage.folder") ?? "";
+
+		const nsp:string = config.get('NSPIP') ?? 'localhost';
+		const user:string = config.get("user") ?? "admin";
+		const port:string = config.get("port") ?? "443";
+		const pass = await this.secretStorage.get("nsp_wfm_password");
+
+		if (nsp !== this.nspAddr || user !== this.username || port !== this.port || pass !== this.password) {
+			this.pluginLogs.warn("Disconnecting from NSP", this.nspAddr);
+			this._revokeAuthToken();
+			this.nspAddr = nsp;
+			this.username = user;
+			this.port = port;
+			this.nspVersion = undefined;
+			this.osdVersion = undefined;
+			
+			DECORATION_CONNECTED.tooltip = "Connecting..."; // revert to original text
+			DECORATION_DISCONNECTED.tooltip = "Not connected!"; // revert to original text
+			this._eventEmiter.fire(vscode.Uri.parse('wfm:/'));
+		}
+		this.workflow_folders = {};
+		this.workflows = {};
+		this.workflow_documentations = {};
+		this.workflow_views = {};
+		this.actions = {};
+		this.templates = {};
+		vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer');
+	}
+
 
 	// --- manage file events
 	private _emitter = new vscode.EventEmitter<vscode.FileChangeEvent[]>();

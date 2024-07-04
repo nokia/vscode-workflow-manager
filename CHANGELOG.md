@@ -1,4 +1,4 @@
-# Change Log
+> # Change Log
 
 
 
@@ -76,7 +76,7 @@ Updates:
     - .action for actions
     - .yaml for workflows
     - .jinja for templates
-____
+
 
 ## [2.0.0]
 
@@ -90,9 +90,10 @@ ____
         - file: README.md (workflow documentation)
 ____
 
-* Example:
+<p align="center">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/image.png" width="250" alt="Status bar showing current NSP server">
+</p>
 
-![alt text](media/image.png)
 ____
 
 * Users can create a workflow by creating a new folder in the 'workflows' directory. Doing this will automatically generate the three workflow files for the workflow definition, view, and documentation.
@@ -102,7 +103,8 @@ ____
 * Error Checking/Restrictions:
     - Users cannot delete any of the workflow files, as each of the files is associateed with the workflow. In order to delete a workflow and its associative files, the user must delete the associative workflow folder.
     - Users cannot rename any of the three workflow files as the name of the view, the definition, and the workflow folder must be the same. Renaming workflows is supported by renaming the associative workflow folder which will automatically rename the workflow files within that folder to match. 
-____
+
+_____
 
 ## [2.0.1]
 
@@ -112,3 +114,46 @@ ____
     - Fixed issues with the generateSchema function and modified the wfm-schema-builder Jinja template to prevent red highlights/warnings in the workflow definitions if they are correct.
     - Workflow folder names containing dots (.) were causing unexpected behavior. Addressed the issue with workflow folder names containing dots. This fix allows workflow names to include dots without causing errors.
 ____
+
+## [2.0.2] 
+
+
+### UI/UX Improvements 
+
+- Workspace entry Workflow Manager tooltip include details when not connected / connection errors to replace error dialogue. Results in better user experience, especially when multiple NSP extensions are installed.
+- Show NSP version as {major}.{minor}. With this "24.4.0" is displayed now as "24.4".
+- OSD version is retrieved and displayed.
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/folderEnhancements.png" width="450" height='auto'>
+</p>
+
+### Logging to VsCode Output Channel
+
+* Logging for workflow manager operations using output channels of vscode. Logs are cleaned up and use the correct severity.
+* Moved plugin logging to log output channel of vscode (not console.log/warn/error anymore).
+  * Setup loglevel as desired from UI.
+  * Logging is available in normal production environment (no need to debug the plugin).
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/loggingSelection.png" width="850">
+</p>
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/logging.png" width="850">
+</p>
+
+
+### Alignment with Intent Manager
+
+- getAuthToken() is now preformed in callNSP so it has been removed from all functions previously calling it to make NSP API calls.
+- As outlined above there is no more console logging in the plugin. All logging is done through the log output channel of vscode.
+
+### Settings have been moved to workspace settings rather than global user settings.
+
+- To allow for multi-server support, the active nsp Server, the port, and connection details has been moved to workspace settings: (window scope instead of application scope). This allows for different workspaces to connect to different NSP servers.
+
+### Implemented a command function nokia-wfm.connect (Provides support for NSP-Connect extension):
+
+- The command can be called by other extensions (NSP-connect - not released yet) to connect to the NSP server using certain credentials specified by the NSP-connect extension.
+- This does no affect the current functionality of the WFM extension.

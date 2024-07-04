@@ -1,8 +1,8 @@
 {
   "name": "nokia-wfm",
   "displayName": "NOKIA_WFM",
-  "description": "NOKIA WFM vsCode Developer Plugin",
-  "version": "2.0.1",
+  "description": "NOKIA WFM VsCode Developer Plugin",
+  "version": "2.0.2",
   "icon": "media/Nokia_WFM.png",
   "publisher": "Nokia",
   "engines": { 
@@ -26,29 +26,29 @@
     "configuration": {
       "title": "WorkflowManager",
       "properties": {
-        "workflowManager.server": {
+        "workflowManager.NSPIP": {
           "type": "string",
           "default": "127.0.0.1",
-          "scope": "application",
+          "scope": "window",
           "format": "ipv4",
           "description": "NSP server address"
         },
-        "workflowManager.username": {
+        "workflowManager.user": {
           "type": "string",
           "default": "username",
-          "scope": "application",
+          "scope": "window",
           "description": "NSP username"
         },
         "workflowManager.password": {
           "description": "NSP password",
           "type": "null",
-          "scope": "application",
-          "markdownDescription": "[Set Password](command:nokia-wfm.setPassword)"
+          "scope": "window",
+         "markdownDescription": "[Set Password](command:nokia-wfm.setPassword)"
         },
         "workflowManager.port":{
           "type": "string",
-          "default": "8546",
-          "scope": "application",
+          "default": "443",
+          "scope": "window",
           "description": "NSP WFM port."
         },
         "workflowManager.localStorage.enable": {
