@@ -48,7 +48,9 @@ This package uses YAML, FETCH, vscode-URI and base-64 packages. For FETCH, it is
 
 To allow local storage of workflows, you need to configure the following attributes in the VsCode workflowManager extension settings: 
 
-**ctrl+shift+p > Preferences: Open Settings > Extensions > Workflow Manager**
+```
+ctrl+shift+p > Preferences: Open Settings > Extensions > Workflow Manager
+```
 
 * `Allow local storage`: Enable the local storage of workflows when saving, to keep as backup.
 * `Local storage folder`: Folder where workflows are copied, if the above flag is enabled.
@@ -59,7 +61,9 @@ To allow local storage of workflows, you need to configure the following attribu
 
 To connect to an NSP WFM, you need to configure the following attributes in VsCode **workspace settings:**
 
-**ctrl+shift+p > Preferences: Open Workspace Settings > Extensions > Workflow Manager**
+```
+ctrl+shift+p > Preferences: Open Workspace Settings > Extensions > Workflow Manager
+```
 
 * `NSP IP address`: Ip address of the remote NSP server.
 * `NSP user`: User name.
