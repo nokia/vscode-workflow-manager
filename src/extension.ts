@@ -110,22 +110,20 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	}));
 
-	vscode.commands.registerCommand('nokia-wfm.connect', async (username: string|undefined, password: string|undefined, nspAddr: string|undefined, standardPort: Boolean) => {
+	vscode.commands.registerCommand('nokia-wfm.connect', async (username: string|undefined, password: string|undefined, nspAddr: string|undefined, port: string) => {
 		const config = vscode.workspace.getConfiguration('workflowManager');
-		if (username === undefined)
+		if (username === undefined) {
 			username = await vscode.window.showInputBox({title: "Username"});
-		if (username !== undefined)
-			config.update("user", username, vscode.ConfigurationTarget.Workspace);
-		if (password === undefined)
-			password = await vscode.window.showInputBox({password: true, title: "Password"});
-		if (password !== undefined)
-			secretStorage.store("nsp_wfm_password", password);
-		if (standardPort === true) {
-			config.update("port", "443", vscode.ConfigurationTarget.Workspace);
-		} else {
-			let wfmPort = await vscode.window.showInputBox({ prompt: 'Enter Port for NSP WFM...' });
-			config.update("port", wfmPort, vscode.ConfigurationTarget.Workspace);
 		}
+		if (username !== undefined) {
+			config.update("user", username, vscode.ConfigurationTarget.Workspace);
+		}
+		if (password === undefined) {
+			password = await vscode.window.showInputBox({password: true, title: "Password"});
+		} else {
+			secretStorage.store("nsp_wfm_password", password);
+		}
+		config.update("port", port, vscode.ConfigurationTarget.Workspace);
 		config.update("NSPIP", nspAddr, vscode.ConfigurationTarget.Workspace);
 	});
 
