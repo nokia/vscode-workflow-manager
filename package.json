@@ -2,7 +2,7 @@
   "name": "nokia-wfm",
   "displayName": "NOKIA_WFM",
   "description": "NOKIA WFM VsCode Developer Plugin",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "icon": "media/Nokia_WFM.png",
   "publisher": "Nokia",
   "engines": { 
@@ -43,7 +43,7 @@
           "description": "NSP password",
           "type": "null",
           "scope": "window",
-          "markdownDescription": "[Set Password]"
+         "markdownDescription": "[Set Password](command:nokia-wfm.setPassword)"
         },
         "workflowManager.port":{
           "type": "string",

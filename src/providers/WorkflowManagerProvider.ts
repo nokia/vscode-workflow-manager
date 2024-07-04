@@ -2638,7 +2638,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			this.port = port;
 			this.nspVersion = undefined;
 			this.osdVersion = undefined;
-
+			
 			DECORATION_CONNECTED.tooltip = "Connecting..."; // revert to original text
 			DECORATION_DISCONNECTED.tooltip = "Not connected!"; // revert to original text
 			this._eventEmiter.fire(vscode.Uri.parse('wfm:/'));

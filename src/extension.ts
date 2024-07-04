@@ -110,6 +110,18 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	}));
 
+	// Set Password for WFM
+	vscode.commands.registerCommand('nokia-wfm.setPassword', async () => {
+		const passwordInput: string = await vscode.window.showInputBox({
+			password: true, 
+			title: "Password"
+		}) ?? '';
+		if(passwordInput !== ''){
+			secretStorage.store("nsp_wfm_password", passwordInput);
+		};
+		wfmProvider.updateSettings(); // config has changed
+	});
+
 	vscode.commands.registerCommand('nokia-wfm.connect', async (username: string|undefined, password: string|undefined, nspAddr: string|undefined, port: string) => {
 		const config = vscode.workspace.getConfiguration('workflowManager');
 		if (username === undefined) {
