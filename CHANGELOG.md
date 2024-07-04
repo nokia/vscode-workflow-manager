@@ -125,7 +125,7 @@ ____
 - OSD version is retrieved and displayed.
 
 <p align="center">
-    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/folderEnhancements.png" width="250">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/folderEnhancements.png" width="450" height='auto'>
 </p>
 
 ### Logging to VsCode Output Channel
