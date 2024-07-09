@@ -21,7 +21,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const server : string   = config.get("NSPIP")   ?? "";
 	const username : string = config.get("user") ?? "";
 	const port : string = config.get("port") ?? "";
-	const timeout : number = config.get("timeout") ?? 20000;
+	const timeout : number = config.get("timeout") ?? 90;
 	const localsave : boolean = config.get("localStorage.enable") ?? false;
 	const localpath : string = config.get("localStorage.folder") ?? "";
 	const fileIgnore : Array<string> = config.get("ignoreTags") ?? [];

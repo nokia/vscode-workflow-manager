@@ -10,8 +10,6 @@ import base64 = require('base-64');
 
 const COLOR_OK            = new vscode.ThemeColor('gitDecoration.untrackedResourceForeground'); // appears green
 const COLOR_READONLY      = new vscode.ThemeColor('list.deemphasizedForeground');
-const COLOR_CUSTOMIZATION = new vscode.ThemeColor('list.highlightForeground'); // appears blue
-const COLOR_WARNING       = new vscode.ThemeColor('list.warningForeground');
 const COLOR_ERROR         = new vscode.ThemeColor('list.errorForeground');
 const DECORATION_DISCONNECTED = { badge: '❗', tooltip: 'Not connected!', color: COLOR_ERROR };  // should become codicon $(warning)
 const DECORATION_CONNECTED    = { badge: '✔',  tooltip: 'Connecting...', color: COLOR_OK };     // should become codicon $(vm-active)
@@ -129,75 +127,87 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	* revoked after 10min.
 	*/	
 	private async _getAuthToken(): Promise<void> {
-        if (this.authToken) {
+		this.pluginLogs.info("executing _getAuthToken()");
+	
+		// Check if we already have a valid authToken
+		if (this.authToken) {
 			const token = await this.authToken;
-            if (!token) {
-                this.authToken = undefined; // Reset authToken, if it is undefined
-            } else {
-				return; // If we have a valid token, no need to proceed further
+			if (token) {
+				this.pluginLogs.info("Using existing authToken");
+				return;
+			} else {
+				this.pluginLogs.warn("Existing authToken is invalid, resetting");
+				this.authToken = undefined; // Reset authToken if it is undefined
 			}
-        }
-
+		}
+	
+		// Retrieve the password from secret storage
 		this.password = await this.secretStorage.get("nsp_wfm_password");
-
-        if (this.password && !this.authToken) {
-            this.authToken = new Promise((resolve, reject) => {
-                this.pluginLogs.warn("No valid auth-token; Getting a new one...");
-                process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
-				// for getting the auth-token, we are using a reduced timeout of 10sec
-                const timeout = new AbortController();
-                setTimeout(() => timeout.abort(), 10000);
-
-                const url = "https://"+this.nspAddr+"/rest-gateway/rest/api/v1/auth/token";
+	
+		// Only proceed if we have a password and no valid authToken
+		if (this.password && !this.authToken) {
+			this.authToken = new Promise((resolve, reject) => {
+				this.pluginLogs.warn("No valid auth-token; Getting a new one...");
+				process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+	
+				const timeout = new AbortController();
+				const timeoutId = setTimeout(() => {
+					this.pluginLogs.warn("Aborting fetch request due to timeout");
+					timeout.abort();
+				}, 10000);
+	
+				const url = "https://"+this.nspAddr+"/rest-gateway/rest/api/v1/auth/token";
 				const startTS = Date.now();
-
-                fetch(url, {
-                    method: "POST",
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Cache-Control': 'no-cache',
-                        'Authorization': 'Basic ' + base64.encode(this.username+ ":" +this.password)
-                    },
-                    body: '{"grant_type": "client_credentials"}',
-                    signal: timeout.signal
-                }).then(async (response:any) => {
-					const duration = Date.now()-startTS;
-                    this.pluginLogs.info("POST", url, "finished within", duration, "ms");
-
+	
+				fetch(url, {
+					method: "POST",
+					headers: {
+						'Content-Type': 'application/json',
+						'Cache-Control': 'no-cache',
+						'Authorization': 'Basic ' + base64.encode(this.username + ":" + this.password)
+					},
+					body: '{"grant_type": "client_credentials"}',
+					signal: timeout.signal
+				}).then(async (response: any) => {
+					clearTimeout(timeoutId); // Clear the timeout if fetch is successful
+					const duration = Date.now() - startTS;
+					this.pluginLogs.info("POST", url, "finished within", duration, "ms");
+	
 					const json = await response.json();
-                    if (response.ok) {
-						this.pluginLogs.info("NSP response:", response.status);
+					if (response.ok) {
+						this.pluginLogs.info("Successfully obtained authToken");
 						resolve(json.access_token);
-						this.pluginLogs.info("new authToken:", json.access_token);
 						setTimeout(() => this._revokeAuthToken(), 600000); // automatically revoke token after 10min
-                    } else {
+					} else {
 						this.pluginLogs.warn("NSP response:", response.status, json.error);
-						DECORATION_DISCONNECTED.tooltip = "Authentication failure (user:"+this.username+", error:"+json.error+")!";
-						this._eventEmiter.fire(vscode.Uri.parse('wfm:/'));
+						DECORATION_DISCONNECTED.tooltip = "Authentication failure (user:" + this.username + ", error:" + json.error + ")!";
 						this.authToken = undefined; // Reset authToken on error
-                        reject("Authentication Error!");
+						this.nspVersion = undefined;
+						this._eventEmiter.fire(vscode.Uri.parse('wfm:/'));
+						reject("Authentication Error!");
 					}
-                }).catch((error:any) => {
-					if (error.message.includes('user aborted'))
-						this.pluginLogs.error("No response for getting authToken within 10sec");
-					else
+				}).catch((error: any) => {
+					clearTimeout(timeoutId); // Clear the timeout if fetch throws an error
+					if (error.name === 'AbortError') {
+						this.pluginLogs.error("Fetch request aborted due to timeout");
+					} else {
 						this.pluginLogs.error("Getting authToken failed with", error.message);
-
-					DECORATION_DISCONNECTED.tooltip = this.nspAddr+" unreachable!";
+					}
+	
+					DECORATION_DISCONNECTED.tooltip = this.nspAddr + " unreachable!";
+					this.nspVersion = undefined;
 					this._eventEmiter.fire(vscode.Uri.parse('wfm:/'));
-
-					this.authToken = undefined; // Reset authToken on error					
-                    resolve(undefined);
-                });
-            });
-        }
-    }
+					this.authToken = undefined; // Reset authToken on error
+					resolve(undefined);
+				});
+			});
+		}
+	}
+	
 
 	/**
 	 * Gracefully revoke NSP auth-token.
-	 */	
-
+	*/	
 	private async _revokeAuthToken(): Promise<void> {
 		this.pluginLogs.info("executing _revokeAuthToken()");
 		if (this.authToken) {
@@ -232,9 +242,10 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 */	
 
 	private async _callNSP(url:string, options:{method: string, body?: string, headers?: object, signal?: AbortSignal}): Promise<void> {
+		this.pluginLogs.info("executing _callNSP("+url+")");
 		const timeout = new AbortController();
         const fetch = require('node-fetch');
-		setTimeout(() => timeout.abort(), this.timeout*1000);
+		setTimeout(() => timeout.abort(), this.timeout*1000); // in seconds
 		options.signal = timeout.signal;
 
 		if (!('headers' in options)) {
@@ -314,7 +325,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				let errmsg = options.method+" "+url+" failed with "+error.message+" after "+duration.toString()+"ms!";
 				if (error.message.includes("user aborted"))
 					errmsg = "No response for "+options.method+" "+url+". Call terminated after "+duration.toString()+"ms.";
-
+				this.nspVersion = undefined;
+				this.authToken = undefined;
+				this._eventEmiter.fire(vscode.Uri.parse('wfm:/'));
 				this.pluginLogs.error(errmsg);
 				vscode.window.showErrorMessage(errmsg);
 				resolve(undefined);
@@ -598,7 +611,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	*/
 	private async _createTemplate(data: string): Promise<void> {
 		this.pluginLogs.info('executing _createTemplate()');
-		this.pluginLogs.info('defualt data: ', data);
 		
 		// validate template definition
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/jinja-template/validate';
@@ -705,7 +717,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const yaml = require('yaml');
 		const doc = yaml.parse(text);
 		doc.name = newName.replace('.jinja', ''); // update the template attribute
-		this.pluginLogs.info('doc: ', doc);
 		await this._updateTemplate(oldName, yaml.stringify(doc));
 	}
 
@@ -801,7 +812,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			if (Object.keys(this.workflows).indexOf(defname)=== -1) { // if the  name is not in the workflows
 				vscode.window.showInformationMessage('Workflow Name changed, creating new workflow.');
 				await this._createWorkflow(defname, data);
-				this.pluginLogs.info('txtdoc path: ', vscode.Uri.parse("wfm:/workflows/" + defname.replace('.yaml','') + "/" +defname));
 				let txtdoc = await vscode.workspace.openTextDocument( vscode.Uri.parse("wfm:/workflows/" + defname.replace('.yaml','') + "/" +defname));
 				vscode.window.showTextDocument(txtdoc);
 			} else {
@@ -832,7 +842,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			vscode.window.showInformationMessage('Success: Workflow validated');
 
 			let id: string;
-			this.pluginLogs.info('name: ', name);
 			if (!name.includes('.yaml')) {
 				id = this.workflows[name + '.yaml'].id;
 			} else {
@@ -1004,8 +1013,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			// make an api call to get the full view info and then update only the data attribute
 			let id = this.workflows[name.replace('.json', '.yaml')].id;
 			let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow/"+id+"/ui";
-			this.pluginLogs.info('url: ', url);
-
 			let response: any = await this._callNSP(url, { // get workflow / action definition
 				method: 'GET'
 			});
@@ -1034,9 +1041,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 		this.pluginLogs.info('executing updateWorkflowView()');
 		const id = this.workflows[name].id;
-		this.pluginLogs.info("data: ", data);
 		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/workflow/'+id+'/ui'; 
-		this.pluginLogs.info('url: ', url);
 		let response: any = await this._callNSP(url, {
 			method: 'PUT',
 			body: JSON.stringify(data)
@@ -1554,7 +1559,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const editor = vscode.window.activeTextEditor; // get the active text editor
 		const extURI = this.extContext.extensionUri;
 		let outpath = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema.json').toString().replace("file://","");
-		this.pluginLogs.info("outpath: ", outpath);
 		if (editor) {
 			const document = editor.document;
 			const wfmSchema = outpath;
@@ -1766,9 +1770,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		let config = vscode.workspace.getConfiguration('workflowManager');
 		const extURI = this.extContext.extensionUri;
 		let templatePath = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema-builder.json.j2').toString().replace("file://","");
-		this.pluginLogs.info("templatePath: ", templatePath);
 		let outpath = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema.json').toString().replace("file://","");
-		this.pluginLogs.info("outpath: ", outpath);
 		let snippetsfile = vscode.Uri.joinPath(extURI, 'schema', 'snippets.json').toString().replace("file://","");
 		let snippets:JSON={} as JSON;
 		let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/action";
@@ -1783,7 +1785,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (!wfm_response){
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
-		this.pluginLogs.info('data: ', wfm_response);
+
 		data = await wfm_response.json();	
 		let actions = data.response.data;
 		let entries: any = {};
@@ -1791,7 +1793,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const YAML = require('yaml');
 		const ny = require('nunjucks');
 		let actionlist = []; // used to store a list of actions
-		this.pluginLogs.info('actions: ', actions);
 		actions.forEach(function(action) {
 			let entry: any = {};
 			try {
@@ -1855,10 +1856,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				actionlist.push(entry.name); // add the action to the list of actions
 			}
 		});
-		this.pluginLogs.info('entries: ', entries);
+
 		var res = ny.render(templatePath, entries); // render the template with the entries
 		let fs = require("fs");
-		this.pluginLogs.info('res: ', res);
 		fs.writeFile(outpath, res, (err) => { 
 			if(err) { 
 				this.pluginLogs.error(err);
@@ -1887,7 +1887,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		} else {
 			schemas[wfmSchema] = workflowUri; // set the schema to the workflow uri
 		}
-		this.pluginLogs.info('schemas: ', schemas);
 		vscode.workspace.getConfiguration('yaml').update('schemas', schemas); // update the schemas
 	}
 
@@ -2429,25 +2428,18 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (uri.toString().startsWith('wfm:/workflows/')) {
 			if (uri.toString().endsWith('.json')) { // if its a view
 				const key = uri.toString().substring(15).split('/').pop();
-				this.pluginLogs.info('key: ', key);
-				this.pluginLogs.info('content: ', content.toString());
 				await this._writeWorkflowView(key, content.toString());
 			} else if (uri.toString().endsWith('.yaml')) { // if its yaml def or readme
 				const key = uri.toString().substring(15).split('/').pop();
-				this.pluginLogs.info('key: ', key);
-				this.pluginLogs.info('content: ', content.toString());
 				await this._writeWorkflow(key, content.toString());
 			} else if (uri.toString().endsWith('.md')) { // if its a readme
-				this.pluginLogs.info('content: ', content.toString());
 				await this._writeWorkflowDocumentation(uri, content.toString());
 			}
 		} else if (uri.toString().startsWith('wfm:/actions/')) {
 			const key = uri.toString().substring(13);
-			this.pluginLogs.info('content: ', content.toString());
 			await this._writeAction(key, content.toString());
 		} else if (uri.toString().startsWith('wfm:/templates/')) {
 			const key = uri.toString().substring(15);
-			this.pluginLogs.info('content: ', content.toString());
 			await this._writeTemplate(key, content.toString());
 		} else {
 			throw vscode.FileSystemError.FileNotFound('Unknown resource-type!');
@@ -2571,8 +2563,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			this.pluginLogs.info("Saving a backup locally in the temp folder "+this.localpath);
 			let extURI = vscode.Uri.parse("file://"+this.localpath);
 			let filepath = vscode.Uri.joinPath(extURI, name).toString().replace("file://","");
-			this.pluginLogs.info('filepath: ', filepath);
-			this.pluginLogs.info('extURI', extURI);
 			fs.writeFile(filepath, data, (err) => {
 				if(err) {
 					this.pluginLogs.error(err); 
@@ -2589,7 +2579,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {vscode.Uri} uri URI of the folder to retrieve from NSP
 	 */	
 	public provideFileDecoration( uri: vscode.Uri): vscode.ProviderResult<vscode.FileDecoration> {
-		this.pluginLogs.info('executing provideFileDecoration()');
+		this.pluginLogs.info('executing provideFileDecoration( ' + uri.toString() + ' )');
 		if (uri.toString() === 'wfm:/') {
 			this.pluginLogs.debug("provideFileDecoration(wfm:/)");
 			if (this.nspVersion) {
@@ -2603,7 +2593,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		
 		if (uri.toString().startsWith('wfm:/workflows/')) {
 			const key = uri.toString().substring(15);
-			this.pluginLogs.info('key: ', key);
 			if (this.workflows[key+'.yaml'].signed) return DECORATION_SIGNED;
 			return DECORATION_UNSIGNED;
 		} else if (uri.toString().startsWith('wfm:/actions/')) {
@@ -2620,7 +2609,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.pluginLogs.info("Executing updateSettings()");
 
 		const config = vscode.workspace.getConfiguration('workflowManager');
-		this.timeout = config.get('timeout') ?? 90000; // default 3min
+		this.timeout = config.get('timeout') ?? 90; // default 3min
 		this.fileIgnore = config.get('ignoreTags') ?? [];
 		this.localsave = config.get("localStorage.enable") ?? false;
 		this.localpath = config.get("localStorage.folder") ?? "";

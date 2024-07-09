@@ -148,6 +148,7 @@ ____
 
 - getAuthToken() is now preformed in callNSP so it has been removed from all functions previously calling it to make NSP API calls.
 - As outlined above there is no more console logging in the plugin. All logging is done through the log output channel of vscode.
+- Increased default timeout for REST calls from 20sec to 90sec for better robbustness. Converted timeout unit of time from milliseconds to seconds for better clarity. (Aligned with Intent Manager Plugin).
 
 ### Settings have been moved to workspace settings rather than global user settings.
 

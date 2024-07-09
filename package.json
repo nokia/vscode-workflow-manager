@@ -65,9 +65,9 @@
         },
         "workflowManager.timeout": {
           "type": "number",
-          "default": 20000,
+          "default": 90,
           "scope": "application",
-          "description": "Connection timeout in ms"
+          "description": "Connection timeout in seconds (default: 90s)"
         },
         "workflowManager.ignoreTags": {
           "type": "array",
