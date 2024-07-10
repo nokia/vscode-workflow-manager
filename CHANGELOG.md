@@ -158,3 +158,6 @@ ____
 
 - The command can be called by other extensions (NSP-connect - not released yet) to connect to the NSP server using certain credentials specified by the NSP-connect extension.
 - This does no affect the current functionality of the WFM extension.
+
+### Created Shared NSP Client (plugin logs) output channel:
+- Renamed output channel to `NSP Server (remote logs)`, to align logging with all NSP plugins
