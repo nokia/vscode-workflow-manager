@@ -35,7 +35,7 @@
         },
         "workflowManager.user": {
           "type": "string",
-          "default": "username",
+          "default": "admin",
           "scope": "window",
           "description": "NSP username"
         },

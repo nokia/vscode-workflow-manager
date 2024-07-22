@@ -130,8 +130,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	private async _getAuthToken(): Promise<void> {
 		this.pluginLogs.info("executing _getAuthToken()");
 	
-		// Check if we already have a valid authToken
-		if (this.authToken) {
+		if (this.authToken) { // Check if we already have a valid authToken
 			const token = await this.authToken;
 			if (token) {
 				this.pluginLogs.info("Using existing authToken");
@@ -2248,94 +2247,98 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.pluginLogs.info('executing stat('+uri+')');
 
 		const path = uri.toString();
+		const pattern = /^wfm:\/([a-z][a-z0-9_-]+)_v\d+$/;
+
 		if (path.endsWith('.')) {
 			throw vscode.FileSystemError.FileNotFound('No Permissions!');
 		}
 		
-		if ((path ==='wfm:/') || (path==='wfm:/workflows') || (path==='wfm:/actions') || (path==='wfm:/templates')) {
-			return {
-				type: vscode.FileType.Directory,
-				ctime: 0,
-				mtime: Date.now(),
-				size: 0,
-				permissions: vscode.FilePermission.Readonly
-			};
+		if (pattern.test(path)) {
+			if ((path ==='wfm:/') || (path==='wfm:/workflows') || (path==='wfm:/actions') || (path==='wfm:/templates')) {
+				return {
+					type: vscode.FileType.Directory,
+					ctime: 0,
+					mtime: Date.now(),
+					size: 0,
+					permissions: vscode.FilePermission.Readonly
+				};
+			}
+	
+			let path_length = path.split('/').length;
+			if (path.startsWith('wfm:/workflows/') && path_length > 3 && !(path.endsWith('.yaml') || path.endsWith('.json') || path.endsWith('.md'))) {
+				this.pluginLogs.error("No Permission to add a folder/file within a workflow folder!");
+				throw vscode.FileSystemError.FileNotFound('No Permission to add a folder/file within a workflow folder!');
+			}
+			
+			else if (path.startsWith('wfm:/workflows/') && !(path.endsWith('.yaml') || path.endsWith('.json') || path.endsWith('.md'))) { // if the uri is a workflow folder
+				if (Object.keys(this.workflow_folders).length === 0) { // if the workflows cache is empty:
+					await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
+				}
+				const key = path.split('/')[2];
+				if (key in this.workflow_folders) {
+					return this.workflow_folders[key];
+				}
+				this.pluginLogs.error("Unkown Workflow!");
+				throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
+			} else if (path.startsWith('wfm:/workflows/') && path.endsWith('.yaml')) {
+				if (Object.keys(this.workflows).length === 0) { // if the workflows are empty
+					await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
+				}
+				const key = path.split('/')[3];
+				if (key in this.workflows) {
+					return this.workflows[key];
+				}
+				this.pluginLogs.error("Unkown Workflow!");
+				throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
+			} else if (path.startsWith('wfm:/workflows/') && path.endsWith('.md')) {
+				if (Object.keys(this.workflows).length === 0) {
+					await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
+				}
+				if (!(path.split('/')[3] === 'README.md')) { // if user attempts to rename the workflow doc to other than README.md
+					return; // returning here will prompt the error checking in rename:
+				}
+				const key = path.split('/')[2] + '.md';
+				if (key in this.workflow_documentations) {
+					return this.workflow_documentations[key];
+				}
+				this.pluginLogs.error("Unkown Workflow!");
+				throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
+			} else if (path.startsWith('wfm:/workflows/') && path.endsWith('.json')) {
+				if (Object.keys(this.workflows).length === 0) {
+					await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
+				}
+				const key = path.split('/')[3];
+				if (key in this.workflow_views) {
+					return this.workflow_views[key];
+				}
+				this.pluginLogs.error("Unkown Workflow!");
+				throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
+			}
+			
+			if (path.startsWith('wfm:/actions/')) {
+				if (Object.keys(this.actions).length === 0) {
+					await this.readDirectory(vscode.Uri.parse('wfm:/actions'));
+				}
+				const key = path.substring(13); // get the key of the action
+				if (key in this.actions) {
+					return this.actions[key];
+				}
+				this.pluginLogs.error("Unkown Action!");
+				throw vscode.FileSystemError.FileNotFound('Unknown action!');
+			} else if(path.startsWith('wfm:/templates/')) {
+				if (Object.keys(this.templates).length === 0) {
+					await this.readDirectory(vscode.Uri.parse('wfm:/templates'));
+				}
+				const key = path.substring(15); // get the key of the action
+				if (key in this.templates) {
+					return this.templates[key];
+				}
+				this.pluginLogs.error("Unkown Template!");
+				throw vscode.FileSystemError.FileNotFound('Unknown template!');
+			}
+		} else {
+			throw vscode.FileSystemError.FileNotFound('Unknown resource!');
 		}
-
-		let path_length = path.split('/').length;
-		if (path.startsWith('wfm:/workflows/') && path_length > 3 && !(path.endsWith('.yaml') || path.endsWith('.json') || path.endsWith('.md'))) {
-			this.pluginLogs.error("No Permission to add a folder/file within a workflow folder!");
-			throw vscode.FileSystemError.FileNotFound('No Permission to add a folder/file within a workflow folder!');
-		}
-		
-		else if (path.startsWith('wfm:/workflows/') && !(path.endsWith('.yaml') || path.endsWith('.json') || path.endsWith('.md'))) { // if the uri is a workflow folder
-			if (Object.keys(this.workflow_folders).length === 0) { // if the workflows cache is empty:
-				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
-			}
-			const key = path.split('/')[2];
-			if (key in this.workflow_folders) {
-				return this.workflow_folders[key];
-			}
-			this.pluginLogs.error("Unkown Workflow!");
-			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
-		} else if (path.startsWith('wfm:/workflows/') && path.endsWith('.yaml')) {
-			if (Object.keys(this.workflows).length === 0) { // if the workflows are empty
-				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
-			}
-			const key = path.split('/')[3];
-			if (key in this.workflows) {
-				return this.workflows[key];
-			}
-			this.pluginLogs.error("Unkown Workflow!");
-			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
-		} else if (path.startsWith('wfm:/workflows/') && path.endsWith('.md')) {
-			if (Object.keys(this.workflows).length === 0) {
-				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
-			}
-			if (!(path.split('/')[3] === 'README.md')) { // if user attempts to rename the workflow doc to other than README.md
-				return; // returning here will prompt the error checking in rename:
-			}
-			const key = path.split('/')[2] + '.md';
-			if (key in this.workflow_documentations) {
-				return this.workflow_documentations[key];
-			}
-			this.pluginLogs.error("Unkown Workflow!");
-			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
-		} else if (path.startsWith('wfm:/workflows/') && path.endsWith('.json')) {
-			if (Object.keys(this.workflows).length === 0) {
-				await this.readDirectory(vscode.Uri.parse('wfm:/workflows'));
-			}
-			const key = path.split('/')[3];
-			if (key in this.workflow_views) {
-				return this.workflow_views[key];
-			}
-			this.pluginLogs.error("Unkown Workflow!");
-			throw vscode.FileSystemError.FileNotFound('Unknown workflow!');
-		}
-		
-		if (path.startsWith('wfm:/actions/')) {
-			if (Object.keys(this.actions).length === 0) {
-				await this.readDirectory(vscode.Uri.parse('wfm:/actions'));
-			}
-			const key = path.substring(13); // get the key of the action
-			if (key in this.actions) {
-				return this.actions[key];
-			}
-			this.pluginLogs.error("Unkown Action!");
-			throw vscode.FileSystemError.FileNotFound('Unknown action!');
-		} else if(path.startsWith('wfm:/templates/')) {
-			if (Object.keys(this.templates).length === 0) {
-				await this.readDirectory(vscode.Uri.parse('wfm:/templates'));
-			}
-			const key = path.substring(15); // get the key of the action
-			if (key in this.templates) {
-				return this.templates[key];
-			}
-			this.pluginLogs.error("Unkown Template!");
-			throw vscode.FileSystemError.FileNotFound('Unknown template!');
-		}
-		this.pluginLogs.error("No Permissions!");
-		throw vscode.FileSystemError.FileNotFound('No Permissions!');
 	}
 
 	/**
