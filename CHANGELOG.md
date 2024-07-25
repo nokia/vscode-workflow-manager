@@ -170,3 +170,7 @@ ______
 - Removed buzzwords such as executing.
 - Included regex patterns to check wether filestat belongs to wfm:/.
 - Update File Decorations to only log wfm:/ files & folders.
+
+### [2.0.4]
+
+- Ensured NSP Connect is able to show connected and getNSPVersion without the user having to click on the Workflow Manager Folder.
