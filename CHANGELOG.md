@@ -161,3 +161,16 @@ ____
 
 ### Created Shared NSP Client (plugin logs) output channel:
 - Renamed output channel to `NSP Server (remote logs)`, to align logging with all NSP plugins
+
+______
+
+### [2.0.3]
+
+- Ensured no logging of non wfm:/ files/folders.
+- Removed buzzwords such as executing.
+- Included regex patterns to check wether filestat belongs to wfm:/.
+- Update File Decorations to only log wfm:/ files & folders.
+
+### [2.0.4]
+
+- Ensured NSP Connect is able to show connected and getNSPVersion without the user having to click on the Workflow Manager Folder.
