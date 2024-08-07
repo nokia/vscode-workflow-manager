@@ -520,7 +520,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to write a Jinja Template to NSP
 	 * @param {string} name - fileName of the file to be written
 	 * @param {string} data - data to be written to the file
-	 */
+	*/
 	private async _writeTemplate(name: string, data: string): Promise<void> {
 		this.pluginLogs.info('[WFM]: writeTemplate()'); // when adding a file if the file does not end with .jinja throw a vscode error and return
 		if (!name.endsWith('.jinja')) { // if the newName does not end with .yaml throw a vscode error and return
@@ -573,7 +573,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			method: 'PUT',
 			body: data
 		});
-		if (!response){
+
+		if (!response) {
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
@@ -1647,14 +1648,14 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 						workflow_name: wfnm,
 						description: "workflow execution from vsCode",
 						input: attribjs
-						}
+					}
 				)
 			});
 			if (!wfm_response){
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			}
 
-				data = await wfm_response.json();
+			data = await wfm_response.json();
 
 			let execid = data.response.data[0].id;
 			vscode.window.showInformationMessage('Workflow '+wfnm+' execution sent',"See in WFM","Cancel").then((selectedItem) => {
@@ -2138,8 +2139,76 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		});
 	}
 
-	// vscode.FileSystemProvider implementation ----------------
+	async testTemplate(): Promise<void> {
+		this.pluginLogs.info('[WFM]: testTemplate()');
 
+		const uri = vscode.window.activeTextEditor?.document.uri.toString();
+		let filename = uri.split('/').pop().split('.')[0].toString();
+
+		let templateInput = {
+			name: filename,
+			data: {}
+		}
+
+		let input = await vscode.window.showInputBox({
+			placeHolder: JSON.stringify(templateInput),
+			prompt: 'Enter the input for the template',
+			value: JSON.stringify(templateInput)
+		});
+
+
+		this.pluginLogs.appendLine('input: ' + input);	
+
+		let jsonInput = await JSON.parse(input);
+		this.pluginLogs.appendLine('jsonInput: ' + JSON.stringify(jsonInput));
+
+		// get auth-token
+		await this._getAuthToken();
+		const token = await this.authToken;
+		if (!token) {
+			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+		}
+
+		const requestHeaders = new fetch.Headers({
+			"Content-Type": "application/json",
+			"Cache-Control": "no-cache",
+			'Authorization': 'Bearer ' + token
+		});
+
+		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action-execution'
+		let response: any = await this._callNSP(url, { 
+			method: 'POST', 
+			headers: requestHeaders,
+			body: JSON.stringify(
+				{
+					name: "nsp.jinja_template",
+					id: "1ba6dfb6-3d67-4a65-ba92-5db89842a503",
+					description: "Executing Action nsp.jinja_template from VsCode",
+					input: jsonInput
+				}
+			)
+		});
+
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
+		let data = await response.json();
+		this.pluginLogs.appendLine('data: ' + JSON.stringify(data, null, 2));
+		this.pluginLogs.appendLine("templateResult: " + data.response.data[0].output.result.template);
+		let templateResult = data.response.data[0].output.result.template;
+		
+		// Step 1: Save the current clipboard content
+		const auxVar = await vscode.env.clipboard.readText();
+		try {
+			await vscode.env.clipboard.writeText(templateResult); // Step 2: Copy the result to the clipboard
+			await vscode.commands.executeCommand('workbench.files.action.compareWithClipboard'); // Step 3: Execute compare with clipboard
+		} catch (error) {
+			vscode.window.showErrorMessage('Error during clipboard comparison: ' + error);
+		} 
+		await vscode.env.clipboard.writeText(auxVar); // Step 4: Restore the original clipboard content
+	}
+
+	// vscode.FileSystemProvider implementation ----------------
 	/**
 	 * vsCode.FileSystemProvider method to read directory entries.
 	 * WorkflowManagerProvider uses this as main method to pull data from WFM

@@ -174,3 +174,14 @@ ______
 ### [2.0.4]
 
 - Ensured NSP Connect is able to show connected and getNSPVersion without the user having to click on the Workflow Manager Folder.
+
+### [2.1.4]
+
+- Added support for to execute/test Jinja templates within the extension.
+- The user can click on the play button icon on the top right corner of the vscode window, adn it will trigger the user to enter a json input for the jinja template.
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/testTemplate.png" width="850">
+</p>
+
+- Once the user enters the json input, the extension will execute the jinja template and display the output on the leftside of the compare with clipboard icon.

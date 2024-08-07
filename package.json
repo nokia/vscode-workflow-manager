@@ -102,6 +102,11 @@
           "group": "navigation"
         },
         {
+          "when": "resourceLangId == jinja",
+          "command": "nokia-wfm.testTemplate",
+          "group": "navigation"
+        },
+        {
           "when": "resourceScheme == wfm && activeEditorIsDirty == true",
           "command": "workbench.files.action.compareWithSaved",
           "group": "navigation"
@@ -171,6 +176,12 @@
         "category": "WFM",
         "title": "Open in Browser",
         "icon": "$(home)"
+      },
+      {
+        "command": "nokia-wfm.testTemplate",
+        "category": "WFM",
+        "title": "Test Jinja Template",
+        "icon": "$(run)"
       }
     ]
   },

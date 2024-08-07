@@ -72,6 +72,10 @@ export function activate(context: vscode.ExtensionContext) {
 		wfmProvider.generateForm();
 	}));
 
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.testTemplate', async () => {
+		wfmProvider.testTemplate();
+	}));
+
 	// // Generate schema for validation
 	wfmProvider.generateSchema();
 
