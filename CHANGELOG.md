@@ -181,7 +181,7 @@ ______
 - The user can click on the play button icon on the top right corner of the vscode window, adn it will trigger the user to enter a json input for the jinja template.
 
 <p align="center">
-    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/testTemplate.png" width="850">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/testTemplate.png" width="500">
 </p>
 
 - Once the user enters the json input, the extension will execute the jinja template and display the output on the leftside of the compare with clipboard icon.
