@@ -126,6 +126,14 @@
           "command": "nokia-wfm.execute",
           "group": "navigation"
         }
+      ],
+
+      "editor/context": [
+        {
+          "command": "nokia-wfm.yaqalator",
+          "group": "WFM",
+          "when": "editorLangId == yaml && editorHasSelection"
+        }
       ]
     },
     "commands": [
@@ -182,6 +190,11 @@
         "category": "WFM",
         "title": "Test Jinja Template",
         "icon": "$(run)"
+      },
+      {
+        "command": "nokia-wfm.yaqalator",
+        "category": "WFM",
+        "title": "Run Yaqalator"
       }
     ]
   },

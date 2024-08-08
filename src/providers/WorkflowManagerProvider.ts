@@ -2139,6 +2139,10 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		});
 	}
 
+	/*
+	 * Method to test a template in WFM and compare template result with with template in a
+	 * compare with clipboard view in VsCode.
+	*/
 	async testTemplate(): Promise<void> {
 		this.pluginLogs.info('[WFM]: testTemplate()');
 
@@ -2185,12 +2189,10 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			)
 		});
 
-		if (!response){
+		if (!response) {
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 		let data = await response.json();
-		this.pluginLogs.appendLine('data: ' + JSON.stringify(data, null, 2));
-		this.pluginLogs.appendLine("templateResult: " + data.response.data[0].output.result.template);
 		let templateResult = data.response.data[0].output.result.template;
 		
 		// Step 1: Save the current clipboard content
@@ -2202,6 +2204,19 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			vscode.window.showErrorMessage('Error during clipboard comparison: ' + error);
 		} 
 		await vscode.env.clipboard.writeText(auxVar); // Step 4: Restore the original clipboard content
+	}
+
+
+	async yaqalator(): Promise<void> {
+		this.pluginLogs.info('[WFM]: yaqalator()');
+
+		const editor = vscode.window.activeTextEditor;
+		const selection = editor.selection;
+		if (selection && !selection.isEmpty) {
+			const selectionRange = new vscode.Range(selection.start.line, selection.start.character, selection.end.line, selection.end.character);
+			const highlighted = editor.document.getText(selectionRange);
+			this.pluginLogs.info("highlighted: " + highlighted);
+		}
 	}
 
 	// vscode.FileSystemProvider implementation ----------------
