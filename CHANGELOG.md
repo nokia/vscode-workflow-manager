@@ -185,3 +185,7 @@ ______
 </p>
 
 - Once the user enters the json input, the extension will execute the jinja template and display the output on the leftside of the compare with clipboard icon.
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/compare.png" width="500">
+</p>

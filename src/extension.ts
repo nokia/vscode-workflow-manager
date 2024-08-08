@@ -72,6 +72,7 @@ export function activate(context: vscode.ExtensionContext) {
 		wfmProvider.generateForm();
 	}));
 
+	// // --- A handler to Test/Execute a Jinja Template when the user clicks the test button
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.testTemplate', async () => {
 		wfmProvider.testTemplate();
 	}));

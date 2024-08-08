@@ -2156,11 +2156,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			value: JSON.stringify(templateInput)
 		});
 
-
-		this.pluginLogs.appendLine('input: ' + input);	
-
 		let jsonInput = await JSON.parse(input);
-		this.pluginLogs.appendLine('jsonInput: ' + JSON.stringify(jsonInput));
 
 		// get auth-token
 		await this._getAuthToken();
