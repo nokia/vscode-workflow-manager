@@ -2206,6 +2206,14 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 
+	// TEST YAQALATOR:
+	// 1. highlight a yaql expression in a yaml file use :<% locate_nsp() %>
+	// 2. right-click and select run yaqalator
+	// 3. enter context for test use nothing, just {}
+	// 4. the result will be in nsp_client logs
+	/**
+	 * Method to execute a yaql expression in WFM
+	*/
 	async yaqalator(): Promise<void> {
 		this.pluginLogs.info('[WFM]: yaqalator()');
 
@@ -2226,11 +2234,12 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				let input = await vscode.window.showInputBox({
 					placeHolder: "Enter the context for the yaql expression",
 					prompt: "Enter the context for the yaql expression",
+					value: "{}"
 				});
 
 				let jsonInput = await JSON.parse(input);
 				this.pluginLogs.info("jsonInput: " + jsonInput);
-				
+
 				// get auth-token
 				await this._getAuthToken();
 				const token = await this.authToken;
@@ -2255,7 +2264,12 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 						}
 					)
 				});
-				this.pluginLogs.info("[WFM]: RESPONSE: ", response);
+				let data = await response.json();
+				let result = data.response.data[0].output.result;
+				this.pluginLogs.info("[WFM]: DATA: ", result);
+
+				// TODO: DETERMINE A METHOD OF SHOWING THE INPUT AND OUTPUT WHEN DONE: ...
+
 			} else {
 				vscode.window.showErrorMessage('Select a valid yaql expression surrounded by <% and %>');
 			}
