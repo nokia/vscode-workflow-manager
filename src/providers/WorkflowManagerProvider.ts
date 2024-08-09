@@ -2195,11 +2195,10 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		let data = await response.json();
 		let templateResult = data.response.data[0].output.result.template;
 		
-		// Step 1: Save the current clipboard content
-		const auxVar = await vscode.env.clipboard.readText();
+		const auxVar = await vscode.env.clipboard.readText(); 		// Save the current clipboard content
 		try {
-			await vscode.env.clipboard.writeText(templateResult); // Step 2: Copy the result to the clipboard
-			await vscode.commands.executeCommand('workbench.files.action.compareWithClipboard'); // Step 3: Execute compare with clipboard
+			await vscode.env.clipboard.writeText(templateResult); // Copy template execution result to the clipboard
+			await vscode.commands.executeCommand('workbench.files.action.compareWithClipboard'); // Execute compare with clipboard
 		} catch (error) {
 			vscode.window.showErrorMessage('Error during clipboard comparison: ' + error);
 		} 
@@ -2216,6 +2215,50 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			const selectionRange = new vscode.Range(selection.start.line, selection.start.character, selection.end.line, selection.end.character);
 			const highlighted = editor.document.getText(selectionRange);
 			this.pluginLogs.info("highlighted: " + highlighted);
+			const regex = /<%[\s\S]*%>/;
+			const match = regex.exec(highlighted);
+			if (match) {
+				this.pluginLogs.info("matched: " + match[0]);
+				let yaqlExpression = match[0].replace(/<%|%>/g, '');
+				this.pluginLogs.info("yaqlExpression: " + yaqlExpression);
+
+				// allow the user to enter input for the yaql expression
+				let input = await vscode.window.showInputBox({
+					placeHolder: "Enter the context for the yaql expression",
+					prompt: "Enter the context for the yaql expression",
+				});
+
+				let jsonInput = await JSON.parse(input);
+				this.pluginLogs.info("jsonInput: " + jsonInput);
+				
+				// get auth-token
+				await this._getAuthToken();
+				const token = await this.authToken;
+				if (!token) {
+					throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+				}
+
+				const requestHeaders = new fetch.Headers({
+					"Content-Type": "application/json",
+					"Cache-Control": "no-cache",
+					'Authorization': 'Bearer ' + token
+				});
+				let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action-execution'
+				let response: any = await this._callNSP(url, { 
+					method: 'POST', 
+					headers: requestHeaders,
+					body: JSON.stringify(
+						{
+							name: "nsp.yaql_eval",
+							description: "Executing Action nsp.yaql_eval from VsCode",
+							input: {context: jsonInput, expression: yaqlExpression}
+						}
+					)
+				});
+				this.pluginLogs.info("[WFM]: RESPONSE: ", response);
+			} else {
+				vscode.window.showErrorMessage('Select a valid yaql expression surrounded by <% and %>');
+			}
 		}
 	}
 

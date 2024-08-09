@@ -177,6 +177,8 @@ ______
 
 ### [2.1.4]
 
+### Validate/Execute Jinja Template in WFM Extension
+
 - Added support for to execute/test Jinja templates within the extension.
 - The user can click on the play button icon on the top right corner of the vscode window, adn it will trigger the user to enter a json input for the jinja template.
 
