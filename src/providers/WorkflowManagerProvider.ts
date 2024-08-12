@@ -1431,6 +1431,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		return html;
 	}
 
+
 	/**
 	 * Method to validate workflows, actions and templates in the editor
 	*/
@@ -2140,6 +2141,10 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	/*
+	// TEST: testTemplate
+	 * Click the run icon on on templates in the editor
+	 * Enter the input for the template - our case: "mydata":{"example":"test"} - (where the cursor already is)
+	 * OUTPUT SHOULD BE test
 	 * Method to test a template in WFM and compare template result with with template in a
 	 * compare with clipboard view in VsCode.
 	*/
@@ -2268,8 +2273,16 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				let result = data.response.data[0].output.result;
 				this.pluginLogs.info("[WFM]: DATA: ", result);
 
-				// TODO: DETERMINE A METHOD OF SHOWING THE INPUT AND OUTPUT WHEN DONE: ...
-
+				const auxVar = await vscode.env.clipboard.readText(); 		// Save the current clipboard content
+				try {
+					let text = editor.document.getText();
+					let newText = text.replace(match[0], result); // copy the new text to the clipboard
+					await vscode.env.clipboard.writeText(newText);
+					await vscode.commands.executeCommand('workbench.files.action.compareWithClipboard'); // Execute compare with clipboard
+				} catch (error) {
+					vscode.window.showErrorMessage('Error during clipboard comparison: ' + error);
+				} 
+				await vscode.env.clipboard.writeText(auxVar); // Step 4: Restore the original clipboard content
 			} else {
 				vscode.window.showErrorMessage('Select a valid yaql expression surrounded by <% and %>');
 			}
