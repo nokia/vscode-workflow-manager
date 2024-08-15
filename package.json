@@ -125,6 +125,11 @@
           "when": "resourceLangId == yaml && resource =~ /^(?!.*wfm:\\/actions\\/).*$/",
           "command": "nokia-wfm.execute",
           "group": "navigation"
+        },
+        {
+          "when": "resourceLangId == yaml && resource =~ /^(?!.*wfm:\\/actions\\/).*$/",
+          "command": "nokia-wfm.runBestPractices",
+          "group": "navigation"
         }
       ],
 
@@ -200,7 +205,7 @@
         "command": "nokia-wfm.runBestPractices",
         "category": "WFM",
         "title": "Run Best Practices",
-        "icon": "$(run)"
+        "icon": "$(feedback)"
       }
     ]
   },

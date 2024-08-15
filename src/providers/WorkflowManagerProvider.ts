@@ -2292,20 +2292,41 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	/**
 	 * Method to scan a workflow and warn users/recommend best practices according to: 
 	 * https://network.developer.nokia.com/learn/24_4/network-programmability-automation-frameworks/workflow-manager-framework/wfm-workflow-development/wfm-best-practices/
+	 * @param {vscode.DiagnosticCollection} bestPracticesDiagnostics
 	*/
-	async runBestPractices(): Promise<void> {
+	async runBestPractices(bestPracticesDiagnostics: vscode.DiagnosticCollection): Promise<void> {
 		this.pluginLogs.info('[WFM]: runBestPractices()');
+		
+		bestPracticesDiagnostics.clear(); // clear any previous diagnostics
+		let diagnostics: vscode.Diagnostic[] = [];
+		const content = vscode.window.activeTextEditor?.document.getText();
 
+		// BEST PRACTICE: Check for hardcoded IP addresses
+		let ipAddresses = content.match(/(?:[0-9]{1,3}\.){3}[0-9]{1,3}.*\n/g);
+		if (ipAddresses) { // check for hardcoded IP's
+			ipAddresses.forEach(ip => {
+				let startLine = content.split(ip)[0].split('\n').length - 1;
+				let startChar = content.split(ip)[0].split('\n').pop().length;
+				let endLine = startLine;
+				let endChar = startChar + ip.length;
+				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Hardcoded IP address found: " + ip, vscode.DiagnosticSeverity.Warning);
+				diagnostics.push(diagnostic);
+			});
+		}
+
+		if (vscode.window.activeTextEditor) { // Set the diagnostics in the collection
+			bestPracticesDiagnostics.set(vscode.window.activeTextEditor.document.uri, diagnostics);
+		}
 	}
 
-	
+
 	// vscode.FileSystemProvider implementation ----------------
 	/**
 	 * vsCode.FileSystemProvider method to read directory entries.
 	 * WorkflowManagerProvider uses this as main method to pull data from WFM
 	 * while storing it in memory (as cache).
 	 * @param {vscode.Uri} uri URI of the folder to retrieve from NSP
-	 */	
+	*/	
 	async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
 		this.pluginLogs.info("[WFM]: readDirectory("+uri.toString()+")");
 		let url = undefined;

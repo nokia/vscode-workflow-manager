@@ -25,7 +25,8 @@ export function activate(context: vscode.ExtensionContext) {
 	const localsave : boolean = config.get("localStorage.enable") ?? false;
 	const localpath : string = config.get("localStorage.folder") ?? "";
 	const fileIgnore : Array<string> = config.get("ignoreTags") ?? [];
-
+	const bestPracticesDiagnostics = vscode.languages.createDiagnosticCollection('[WFM]: bestPractices');
+	
 	const wfmProvider = new WorkflowManagerProvider(server, username, secretStorage, port, localsave, localpath, timeout, fileIgnore);
 	
 	context.subscriptions.push(vscode.workspace.registerFileSystemProvider('wfm', wfmProvider, { isCaseSensitive: true }));
@@ -82,7 +83,7 @@ export function activate(context: vscode.ExtensionContext) {
 	}));
 
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.runBestPractices', async () => {
-		wfmProvider.runBestPractices();
+		wfmProvider.runBestPractices(bestPracticesDiagnostics);
 	}));
 
 	// // Generate schema for validation
