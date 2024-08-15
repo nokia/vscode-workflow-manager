@@ -195,6 +195,12 @@
         "command": "nokia-wfm.yaqalator",
         "category": "WFM",
         "title": "Run Yaqalator"
+      },
+      {
+        "command": "nokia-wfm.runBestPractices",
+        "category": "WFM",
+        "title": "Run Best Practices",
+        "icon": "$(run)"
       }
     ]
   },

@@ -2289,6 +2289,16 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 	}
 
+	/**
+	 * Method to scan a workflow and warn users/recommend best practices according to: 
+	 * https://network.developer.nokia.com/learn/24_4/network-programmability-automation-frameworks/workflow-manager-framework/wfm-workflow-development/wfm-best-practices/
+	*/
+	async runBestPractices(): Promise<void> {
+		this.pluginLogs.info('[WFM]: runBestPractices()');
+
+	}
+
+	
 	// vscode.FileSystemProvider implementation ----------------
 	/**
 	 * vsCode.FileSystemProvider method to read directory entries.

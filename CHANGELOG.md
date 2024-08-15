@@ -191,3 +191,25 @@ ______
 <p align="center">
     <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/compare.png" width="500">
 </p>
+
+
+### Run Yaql Expressions in WFM Extension
+
+- Added support for running Yaql expressions within the extension.
+- The user needs to highlight the yaql expression surrounded by <% %>, then right click and select "Run Yaql Expression".
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/yaqlHighlight.png" width="500">
+</p>
+
+- The user will then be prompted to enter the json context/input for the yaql expression.
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/yaqlInput.png" width="500">
+</p>
+
+- Once the user enters the json input, the extension will execute the yaql expression using the yaqlator NSP api and display the output on the leftside of the compare with clipboard icon.
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/media/yaqlOutput.png" width="500">
+</p>

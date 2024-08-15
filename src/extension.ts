@@ -81,6 +81,10 @@ export function activate(context: vscode.ExtensionContext) {
 		wfmProvider.yaqalator();
 	}));
 
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.runBestPractices', async () => {
+		wfmProvider.runBestPractices();
+	}));
+
 	// // Generate schema for validation
 	wfmProvider.generateSchema();
 
