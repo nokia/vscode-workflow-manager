@@ -2314,6 +2314,59 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			});
 		}
 
+		// BEST PRACTICE: Check for no Workflow Documentation:
+		let uri = vscode.window.activeTextEditor?.document.uri;
+		let docUri = uri?.toString().replace(uri?.path.split('/').pop(), 'README.md');
+		let docContent = await this.readFile(vscode.Uri.parse(docUri));
+		if (!docContent || docContent.toString().trim() === "") {
+			let diagnostic = new vscode.Diagnostic(new vscode.Range(0, 0, 0, 0), "WFM - Best Practices: No documentation found for the workflow", vscode.DiagnosticSeverity.Warning);
+			bestPracticesDiagnostics.set(vscode.Uri.parse(docUri), [diagnostic]); // apply to documentation file
+		}
+		
+		
+		// BEST PRACTICE: Check for locate_nsp() in the workflow:
+		let locate_nsp = content.match(/<%[\s\S]*locate_nsp\(\)[\s\S]*%>/);
+		if (locate_nsp) {
+			let startLine = content.split(locate_nsp[0])[0].split('\n').length - 1;
+			let startChar = content.split(locate_nsp[0])[0].split('\n').pop().length;
+			let endLine = startLine;
+			let endChar = startChar + locate_nsp[0].length;
+			let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Use Kubernetes service names instead of locate_nsp() which takes too long to evaluate", vscode.DiagnosticSeverity.Warning);
+			diagnostics.push(diagnostic);
+		}
+
+// number of outputs should be equal to number of output-on-error
+
+
+		// BEST PRACTICE: Check for output-on-error:
+		let outputOnError = content.match(/output-on-error:/g);
+		let output = content.match(/output:/g);
+		if (output && outputOnError) {
+			output.forEach((out, index) => {
+				if (outputOnError[index] === undefined) {
+					let startLine = content.split(out)[0].split('\n').length - 1;
+					let startChar = content.split(out)[0].split('\n').pop().length;
+					let endLine = startLine;
+					let endChar = startChar + out.length;
+					let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Add support for output and output-on-error to simplify result processing", vscode.DiagnosticSeverity.Warning);
+					diagnostics.push(diagnostic);
+				}
+			});
+		}
+
+		// BEST PRACTICE: Do not use special characters in the workflow or artifact name. These will cause issues when executed using the API
+		let filename = vscode.window.activeTextEditor?.document.fileName.split('/').pop().split('.')[0].toString();
+		let workflowName = filename + ':';
+		let specialChars = workflowName.match(/[^a-zA-Z0-9_]/g);
+		if (specialChars) {
+			let startLine = content.split(workflowName)[0].split('\n').length - 1;
+			let startChar = content.split(workflowName)[0].split('\n').pop().length;
+			let endLine = startLine;
+			let endChar = startChar + workflowName.length;
+			let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Do not use special characters in the workflow or artifact name. These will cause issues when executed using the API", vscode.DiagnosticSeverity.Warning);
+			diagnostics.push(diagnostic);
+		}
+
 		if (vscode.window.activeTextEditor) { // Set the diagnostics in the collection
 			bestPracticesDiagnostics.set(vscode.window.activeTextEditor.document.uri, diagnostics);
 		}
