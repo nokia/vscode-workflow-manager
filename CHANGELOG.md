@@ -211,5 +211,20 @@ ______
 - Once the user enters the json input, the extension will execute the yaql expression using the yaqlator NSP api and display the output on the leftside of the compare with clipboard icon.
 
 <p align="center">
-    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/media/yaqlOutput.png" width="500">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/yaqlOutput.png" width="500">
+</p>
+
+### Enforcing Workflow Best Practices:
+
+- Added a new button/icon in the top right corner of the vscode window to enforce workflow best practices, whenever a workflow is opened in the editor.
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/bestP.png" width="500">
+</p>
+
+- Once the user clicks on the icon, the vscode problem channel will display warnings/hints that are present in the workflow definition file, with regards to violations or recomendations of best practices.
+
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/bestPractices.png" width="500">
 </p>

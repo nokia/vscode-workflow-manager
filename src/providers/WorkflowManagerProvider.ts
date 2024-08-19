@@ -2319,7 +2319,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		let docUri = uri?.toString().replace(uri?.path.split('/').pop(), 'README.md');
 		let docContent = await this.readFile(vscode.Uri.parse(docUri));
 		if (!docContent || docContent.toString().trim() === "") {
-			let diagnostic = new vscode.Diagnostic(new vscode.Range(0, 0, 0, 0), "WFM - Best Practices: No documentation found for the workflow", vscode.DiagnosticSeverity.Warning);
+			let diagnostic = new vscode.Diagnostic(new vscode.Range(0, 0, 0, 0), "WFM - Best Practices: No documentation found for the workflow: Add documentation: What’s the use-case? What are the workflow parameters? Pre-requisites? Supported Releases?", vscode.DiagnosticSeverity.Warning);
 			bestPracticesDiagnostics.set(vscode.Uri.parse(docUri), [diagnostic]); // apply to documentation file
 		}
 		
@@ -2334,9 +2334,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Use Kubernetes service names instead of locate_nsp() which takes too long to evaluate", vscode.DiagnosticSeverity.Warning);
 			diagnostics.push(diagnostic);
 		}
-
-// number of outputs should be equal to number of output-on-error
-
 
 		// BEST PRACTICE: Check for output-on-error:
 		let outputOnError = content.match(/output-on-error:/g);
@@ -2366,6 +2363,38 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Do not use special characters in the workflow or artifact name. These will cause issues when executed using the API", vscode.DiagnosticSeverity.Warning);
 			diagnostics.push(diagnostic);
 		}
+
+
+		// BEST PRACTICE: Check for REST queries without filters
+		let restQueries = content.match(/https?:\/\/[^\s]+/g);
+		if (restQueries) {
+			restQueries.forEach(query => {
+				if (!query.includes('?')) { // If no query parameters found
+					let startLine = content.split(query)[0].split('\n').length - 1;
+					let startChar = content.split(query)[0].split('\n').pop().length;
+					let endLine = startLine;
+					let endChar = startChar + query.length;
+					let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: REST query found without filters. Apply server-side filtering to reduce data transfer.", vscode.DiagnosticSeverity.Information);
+					diagnostics.push(diagnostic);
+				}
+			});
+		}
+
+		// BEST PRACTICE: Use nsp.https instead of std.http
+		let httpActions = content.match(/std.http/g);
+		if (httpActions) {
+			httpActions.forEach(action => {
+				let startLine = content.split(action)[0].split('\n').length - 1;
+				let startChar = content.split(action)[0].split('\n').pop().length;
+				let endLine = startLine;
+				let endChar = startChar + action.length;
+				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Use nsp.https instead of std.http", vscode.DiagnosticSeverity.Warning);
+				diagnostics.push(diagnostic);
+			});
+		}
+
+		// BEST PRACTICE: Do not use join statements in conjunction with with-items & concurrency in the same task. Instead separate the join and the with-items/concurrency into two tasks, create a std.noop task with the join statement first and then have the with-items task run next on-complete of the std.noop task
+
 
 		if (vscode.window.activeTextEditor) { // Set the diagnostics in the collection
 			bestPracticesDiagnostics.set(vscode.window.activeTextEditor.document.uri, diagnostics);
