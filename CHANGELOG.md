@@ -211,7 +211,7 @@ ______
 - Once the user enters the json input, the extension will execute the yaql expression using the yaqlator NSP api and display the output on the leftside of the compare with clipboard icon.
 
 <p align="center">
-    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/yaqlOutput.png" width="500">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/yaqlOutput.png" >
 </p>
 
 ### Enforcing Workflow Best Practices:
@@ -226,5 +226,5 @@ ______
 
 
 <p align="center">
-    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/bestPractices.png" width="500">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/bestPractices.png"  >
 </p>

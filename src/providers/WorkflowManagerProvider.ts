@@ -2393,8 +2393,23 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			});
 		}
 
-		// BEST PRACTICE: Do not use join statements in conjunction with with-items & concurrency in the same task. Instead separate the join and the with-items/concurrency into two tasks, create a std.noop task with the join statement first and then have the with-items task run next on-complete of the std.noop task
+		//BEST PRACTICE: Do not use join with with-items or concurrency in the same task
+		const yaml = require('yaml');
+		const yamlDoc = yaml.parse(content);
+		let tasks: any = yamlDoc[filename]['tasks'];
+		let tasksList = Object.keys(tasks);
 
+		for (let i = 0; i < tasksList.length; i++) {
+			let task = tasks[tasksList[i]];
+			if (task['join'] != undefined && (task['with-items'] != undefined || task['concurrency'] != undefined)) {
+				let startLine = content.split("tasks"+':')[0].split('\n').length - 1;
+				let startChar = content.split("tasks"+':')[0].split('\n').pop().length;
+				let endLine = startLine;
+				let endChar = startChar + "tasks".length;
+				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Do not use join statements in conjunction with with-items & concurrency in the same task. Instead separate the join and the with-items/concurrency into two tasks, create a std.noop task with the join statement first and then have the with-items task run next on-complete of the std.noop task", vscode.DiagnosticSeverity.Warning);
+				diagnostics.push(diagnostic);
+			}
+		}
 
 		if (vscode.window.activeTextEditor) { // Set the diagnostics in the collection
 			bestPracticesDiagnostics.set(vscode.window.activeTextEditor.document.uri, diagnostics);
