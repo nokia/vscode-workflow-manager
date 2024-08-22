@@ -2411,6 +2411,20 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 		}
 
+		// BEST PRACTICE: Avoid using vars that take too long to evaluate. Long evaluating vars will 
+		// timeout after 60s. 
+		// Remove them from the definition and define then as part of some task.
+		const varsRegex = /vars:\s*[\s\S]*\n/g;
+		const varsMatch = content.match(varsRegex);
+		if (varsMatch) {
+			let startLine = content.split(varsMatch[0])[0].split('\n').length - 1;
+			let startChar = content.split(varsMatch[0])[0].split('\n').pop().length;
+			let endLine = startLine;
+			let endChar = startChar + varsMatch[0].length;
+			let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Avoid using vars that take too long to evaluate. Long evaluating vars will timeout after 60s. Remove them from the definition and define then as part of some task.", vscode.DiagnosticSeverity.Hint);
+			diagnostics.push(diagnostic);
+		}
+
 		if (vscode.window.activeTextEditor) { // Set the diagnostics in the collection
 			bestPracticesDiagnostics.set(vscode.window.activeTextEditor.document.uri, diagnostics);
 		}
@@ -2533,7 +2547,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (path.endsWith('.')) {
 			throw vscode.FileSystemError.FileNotFound('No Permissions!');
 		}
-		
 		
 		if ((path ==='wfm:/') || (path==='wfm:/workflows') || (path==='wfm:/actions') || (path==='wfm:/templates')) {
 			this.pluginLogs.debug("stat("+path+")");

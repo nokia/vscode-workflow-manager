@@ -228,3 +228,9 @@ ______
 <p align="center">
     <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/bestPractices.png"  >
 </p>
+
+- Additionally, for non-error/warning best practices I've incorported hints to aid in  workflow development best practices. Can be seen when hovering over certain workflow elements. i.e.
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/hint.png"  >
+</p>
