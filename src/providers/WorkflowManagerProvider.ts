@@ -2475,7 +2475,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 		}
 
-
 		// BEST PRACTICE: Avoid using vars that take too long to evaluate. Long evaluating vars will 
 		// timeout after 60s. Remove them from the definition and define then as part of some task.
 		const varsRegex = /vars:\s*[\s\S]*\n/g;
