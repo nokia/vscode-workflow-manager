@@ -2296,7 +2296,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	*/
 	async runBestPractices(bestPracticesDiagnostics: vscode.DiagnosticCollection): Promise<void> {
 		this.pluginLogs.info('[WFM]: runBestPractices()');
-		
+
 		bestPracticesDiagnostics.clear(); // clear any previous diagnostics
 		let diagnostics: vscode.Diagnostic[] = [];
 		const content = vscode.window.activeTextEditor?.document.getText();
@@ -2309,7 +2309,33 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				let startChar = content.split(ip)[0].split('\n').pop().length;
 				let endLine = startLine;
 				let endChar = startChar + ip.length;
-				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Hardcoded IP address found: " + ip, vscode.DiagnosticSeverity.Warning);
+				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Avoid hard-coding IP addresses into workflows. Use environments and encrypt credentials.: " + ip, vscode.DiagnosticSeverity.Warning);
+				diagnostics.push(diagnostic);
+			});
+		}
+
+		// BEST PRACTICE: Check for hardcoded Passwords:
+		let passwords = content.match(/(?:password|passwd|pass|secret|token|auth|authorization|creds|credentials|login):.*\n/gi);
+		if (passwords) { // check for hardcoded passwords
+			passwords.forEach(pwd => {
+				let startLine = content.split(pwd)[0].split('\n').length - 1;
+				let startChar = content.split(pwd)[0].split('\n').pop().length;
+				let endLine = startLine;
+				let endChar = startChar + pwd.length;
+				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Avoid hard-coding passwords into workflows. Use environments and encrypt credentials.", vscode.DiagnosticSeverity.Hint);
+				diagnostics.push(diagnostic);
+			});
+		}
+
+		// BEST PRACTICE: Check for hardcoded usernames:
+		let usernames = content.match(/(?:username|user|login):.*\n/gi);
+		if (usernames) { // check for hardcoded usernames
+			usernames.forEach(user => {
+				let startLine = content.split(user)[0].split('\n').length - 1;
+				let startChar = content.split(user)[0].split('\n').pop().length;
+				let endLine = startLine;
+				let endChar = startChar + user.length;
+				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Avoid hard-coding usernames into workflows. Use environments and encrypt credentials.", vscode.DiagnosticSeverity.Hint);
 				diagnostics.push(diagnostic);
 			});
 		}
@@ -2323,6 +2349,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			bestPracticesDiagnostics.set(vscode.Uri.parse(docUri), [diagnostic]); // apply to documentation file
 		}
 		
+
 		
 		// BEST PRACTICE: Check for locate_nsp() in the workflow:
 		let locate_nsp = content.match(/<%[\s\S]*locate_nsp\(\)[\s\S]*%>/);
@@ -2365,6 +2392,16 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 
 
+		// BEST PRACTICE: Incorporate version control, use semantic versioning (SemVer): {major}.{minor}	
+		let firstLines = content.split(filename + ':')[0].split('\n'); // get all lines before workflow name:
+		let regex = /version:\s*'(\d+\.\d+(\.\d+)?)'/;
+		let version = firstLines.join('\n').match(regex);
+		if (!version) {
+			let diagnostic = new vscode.Diagnostic(new vscode.Range(0, 0, 0, 10), "WFM - Best Practices: Incorporate version control, use semantic versioning (SemVer): {major}.{minor}", vscode.DiagnosticSeverity.Warning);
+			diagnostics.push(diagnostic);
+		}
+
+
 		// BEST PRACTICE: Check for REST queries without filters
 		let restQueries = content.match(/https?:\/\/[^\s]+/g);
 		if (restQueries) {
@@ -2393,14 +2430,17 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			});
 		}
 
-		//BEST PRACTICE: Do not use join with with-items or concurrency in the same task
+
 		const yaml = require('yaml');
 		const yamlDoc = yaml.parse(content);
 		let tasks: any = yamlDoc[filename]['tasks'];
 		let tasksList = Object.keys(tasks);
-
+		
 		for (let i = 0; i < tasksList.length; i++) {
 			let task = tasks[tasksList[i]];
+			let taskName = tasksList[i];
+
+			// BEST PRACTICE: Do not use join with with-items or concurrency in the same task
 			if (task['join'] != undefined && (task['with-items'] != undefined || task['concurrency'] != undefined)) {
 				let startLine = content.split("tasks"+':')[0].split('\n').length - 1;
 				let startChar = content.split("tasks"+':')[0].split('\n').pop().length;
@@ -2409,11 +2449,35 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Do not use join statements in conjunction with with-items & concurrency in the same task. Instead separate the join and the with-items/concurrency into two tasks, create a std.noop task with the join statement first and then have the with-items task run next on-complete of the std.noop task", vscode.DiagnosticSeverity.Warning);
 				diagnostics.push(diagnostic);
 			}
+			
+			// BEST PRACTICE: Do not use std.fail to fail tasks and proceed further in the flow. std.fail fails the entire workflow. Instead use nsp.assert to pass/fail the tasks validation
+			if (task['action'] === 'std.fail') {
+				let startLine = content.split("tasks"+':')[0].split('\n').length - 1;
+				let startChar = content.split("tasks"+':')[0].split('\n').pop().length;
+				let endLine = startLine;
+				let endChar = startChar + "tasks".length;
+				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Do not use std.fail to fail tasks and proceed further in the flow. std.fail fails the entire workflow. Instead use nsp.assert to pass/fail the tasks validation", vscode.DiagnosticSeverity.Warning);
+				diagnostics.push(diagnostic);
+			}
+
+			// BEST PRACTICE: When a task is reused in multiple branches specifically a task that has a further flow, use a "join: 0" 
+			let taskNameCount = (content.match(new RegExp(taskName, "g")) || []).length;
+			if (taskNameCount > 2)	{	// if taskname comes up more than once in the rest of the content, because first is the taks def and then once, so > 2
+				if (task['join'] === 0) { // check the yaml to make sure join: 0 is aready not there
+					continue;
+				}
+				let startLine = content.split(taskName + ":")[0].split('\n').length - 1;
+				let startChar = content.split(taskName + ":")[0].split('\n').pop().length;
+				let endLine = startLine;
+				let endChar = startChar + taskName.length;
+				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: When a task is reused in multiple branches specifically a task that has a further flow, use a 'join: 0' on such tasks to make the previewer flow diagram more compact. This does not impact the execution flow", vscode.DiagnosticSeverity.Information);
+				diagnostics.push(diagnostic);
+			}
 		}
 
+
 		// BEST PRACTICE: Avoid using vars that take too long to evaluate. Long evaluating vars will 
-		// timeout after 60s. 
-		// Remove them from the definition and define then as part of some task.
+		// timeout after 60s. Remove them from the definition and define then as part of some task.
 		const varsRegex = /vars:\s*[\s\S]*\n/g;
 		const varsMatch = content.match(varsRegex);
 		if (varsMatch) {

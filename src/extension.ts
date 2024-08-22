@@ -25,8 +25,8 @@ export function activate(context: vscode.ExtensionContext) {
 	const localsave : boolean = config.get("localStorage.enable") ?? false;
 	const localpath : string = config.get("localStorage.folder") ?? "";
 	const fileIgnore : Array<string> = config.get("ignoreTags") ?? [];
-	const bestPracticesDiagnostics = vscode.languages.createDiagnosticCollection('[WFM]: bestPractices');
-	
+	const bestPracticesDiagnostics = vscode.languages.createDiagnosticCollection('[WFM]: bestPractices: ' + "https://network.developer.nokia.com/learn/24_4/network-programmability-automation-frameworks/workflow-manager-framework/wfm-workflow-development/wfm-best-practices/");
+
 	const wfmProvider = new WorkflowManagerProvider(server, username, secretStorage, port, localsave, localpath, timeout, fileIgnore);
 	
 	context.subscriptions.push(vscode.workspace.registerFileSystemProvider('wfm', wfmProvider, { isCaseSensitive: true }));
@@ -154,7 +154,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	
-	  // checks if the workspace folder is nsp-workflow and hides the examples button
+	// checks if the workspace folder is nsp-workflow and hides the examples button
 	vscode.workspace.onDidChangeWorkspaceFolders(async () => {
 		const workspaceFolders =  vscode.workspace.workspaceFolders ?  vscode.workspace.workspaceFolders : [];
 		if (workspaceFolders.find( ({name}) => name === 'nsp-workflow')) {

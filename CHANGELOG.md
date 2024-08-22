@@ -175,7 +175,7 @@ ______
 
 - Ensured NSP Connect is able to show connected and getNSPVersion without the user having to click on the Workflow Manager Folder.
 
-### [2.1.4]
+### [3.0.0]
 
 ### Validate/Execute Jinja Template in WFM Extension
 
