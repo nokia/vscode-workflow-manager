@@ -2212,7 +2212,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 
 	// TEST YAQALATOR:
-	// 1. highlight a yaql expression in a yaml file use :<% locate_nsp() %>
+	// 1. highlight a yaql expression in a yaml file use :<% locate_nsp() %> (in "cleanup_WFM.yaml")
 	// 2. right-click and select run yaqalator
 	// 3. enter context for test use nothing, just {}
 	// 4. the result will be in nsp_client logs
@@ -2429,7 +2429,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				diagnostics.push(diagnostic);
 			});
 		}
-
 
 		const yaml = require('yaml');
 		const yamlDoc = yaml.parse(content);
