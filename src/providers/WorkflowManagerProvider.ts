@@ -2140,11 +2140,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		});
 	}
 
-	/*
+	/* 
 	// TEST: testTemplate
 	 * Click the run icon on on templates in the editor
-	 * Enter the input for the template - our case: "mydata":{"example":"test"} - (where the cursor already is)
-	 * OUTPUT SHOULD BE test
 	 * Method to test a template in WFM and compare template result with with template in a
 	 * compare with clipboard view in VsCode.
 	*/
@@ -2162,10 +2160,11 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		let input = await vscode.window.showInputBox({
 			placeHolder: JSON.stringify(templateInput),
 			prompt: 'Enter the input for the template',
-			value: JSON.stringify(templateInput)
+			value: "{}"
 		});
 
-		let jsonInput = await JSON.parse(input);
+		templateInput.data = await JSON.parse(input);
+		this.pluginLogs.info('templateInput: ' + JSON.stringify(templateInput));
 
 		// get auth-token
 		await this._getAuthToken();
@@ -2189,17 +2188,20 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					name: "nsp.jinja_template",
 					id: "1ba6dfb6-3d67-4a65-ba92-5db89842a503",
 					description: "Executing Action nsp.jinja_template from VsCode",
-					input: jsonInput
+					input: templateInput
 				}
 			)
 		});
+
+		this.pluginLogs.info('response: ' + response);
 
 		if (!response) {
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 		let data = await response.json();
 		let templateResult = data.response.data[0].output.result.template;
-		
+		this.pluginLogs.info('templateResult: ' + templateResult);
+
 		const auxVar = await vscode.env.clipboard.readText(); 		// Save the current clipboard content
 		try {
 			await vscode.env.clipboard.writeText(templateResult); // Copy template execution result to the clipboard
@@ -2210,13 +2212,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		await vscode.env.clipboard.writeText(auxVar); // Step 4: Restore the original clipboard content
 	}
 
-
+	// have a window that asks to review the expression for changes, for something called data etc...
 	// TEST YAQALATOR:
 	// 1. highlight a yaql expression in a yaml file use :<% locate_nsp() %> (in "cleanup_WFM.yaml")
 	// 2. right-click and select run yaqalator
 	// 3. enter context for test use nothing, just {}
 	// 4. the result will be in nsp_client logs
-	/**
+	/*
 	 * Method to execute a yaql expression in WFM
 	*/
 	async yaqalator(): Promise<void> {
@@ -2227,13 +2229,21 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (selection && !selection.isEmpty) {
 			const selectionRange = new vscode.Range(selection.start.line, selection.start.character, selection.end.line, selection.end.character);
 			const highlighted = editor.document.getText(selectionRange);
-			this.pluginLogs.info("highlighted: " + highlighted);
 			const regex = /<%[\s\S]*%>/;
 			const match = regex.exec(highlighted);
 			if (match) {
 				this.pluginLogs.info("matched: " + match[0]);
 				let yaqlExpression = match[0].replace(/<%|%>/g, '');
 				this.pluginLogs.info("yaqlExpression: " + yaqlExpression);
+
+				// make a pop-up window here: allowing use rto modify the expression:
+				let newYaqlExpression = await vscode.window.showInputBox({
+					placeHolder: "YAQL Expression Selected: " + yaqlExpression,
+					prompt: "Modify YAQL Expression if needed",
+					value: yaqlExpression
+				});
+
+				yaqlExpression = newYaqlExpression ? newYaqlExpression : yaqlExpression;
 
 				// allow the user to enter input for the yaql expression
 				let input = await vscode.window.showInputBox({
@@ -2243,7 +2253,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				});
 
 				let jsonInput = await JSON.parse(input);
-				this.pluginLogs.info("jsonInput: " + jsonInput);
 
 				// get auth-token
 				await this._getAuthToken();
@@ -2271,7 +2280,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				});
 				let data = await response.json();
 				let result = data.response.data[0].output.result;
-				this.pluginLogs.info("[WFM]: DATA: ", result);
 
 				const auxVar = await vscode.env.clipboard.readText(); 		// Save the current clipboard content
 				try {
