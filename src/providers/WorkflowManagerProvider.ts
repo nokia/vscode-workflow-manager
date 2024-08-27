@@ -105,7 +105,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.workflow_folders = {};
 
 		// Instantiate the pluginLogs output channel
-		this.pluginLogs = vscode.window.createOutputChannel('NSP Client (plugin logs)', {log: true});
+		this.pluginLogs = vscode.window.createOutputChannel('WFM Plugin Logs', {log: true});
 
 		// used for FileDecorator        
 		this._eventEmiter = new vscode.EventEmitter(); // Event emitter for file decorations
