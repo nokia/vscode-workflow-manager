@@ -2526,6 +2526,19 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 	}
 
+	/**
+	 * Method to delete vscode problems from a diagnostic collections, for a workflow
+	 * @param {vscode.DiagnosticCollection} bestPracticesDiagnostics
+	*/
+	async clearProblems(bestPracticesDiagnostics: vscode.DiagnosticCollection): Promise<void> {
+		this.pluginLogs.info("Removing Diagnostics Collection");
+	
+		let uri = vscode.window.activeTextEditor?.document.uri;
+		let docUri = uri?.toString().replace(uri?.path.split('/').pop(), 'README.md');
+		bestPracticesDiagnostics.delete(uri); // Remove diagnostics for the current document
+		bestPracticesDiagnostics.delete(vscode.Uri.parse(docUri)); // Remove diagnostics for the README file if it exists
+	}
+	
 
 	// vscode.FileSystemProvider implementation ----------------
 	/**

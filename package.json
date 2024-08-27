@@ -130,9 +130,13 @@
           "when": "resourceLangId == yaml && resource =~ /^(?!.*wfm:\\/actions\\/).*$/",
           "command": "nokia-wfm.runBestPractices",
           "group": "navigation"
+        },
+        {
+          "when": "resourceLangId == yaml && resource =~ /^(?!.*wfm:\\/actions\\/).*$/",
+          "command": "nokia-wfm.clearProblems",
+          "group": "navigation"
         }
       ],
-
       "editor/context": [
         {
           "command": "nokia-wfm.yaqalator",
@@ -206,6 +210,12 @@
         "category": "WFM",
         "title": "Run Best Practices",
         "icon": "$(feedback)"
+      },
+      {
+        "command": "nokia-wfm.clearProblems",
+        "category": "WFM",
+        "title": "Clear All Problems",
+        "icon": "$(clear-all)"
       }
     ]
   },
