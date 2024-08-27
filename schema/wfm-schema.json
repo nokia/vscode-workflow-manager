@@ -263,6 +263,7 @@
                         "std.ssh_proxied",
                         "std.test_dict",
                         "std.wait_ssh",
+                        "test",
                         "yang.compare",
                         "yang.convert"
                     ]
@@ -1178,6 +1179,17 @@
                         },
                         "title": "std.wait_ssh",                
                         "markdownDescription": "This action sshs to a host and then waits for 10 seconds"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "test"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/test"}
+                        },
+                        "title": "test",                
+                        "markdownDescription": "No description provided"
                     }
                 },
                 {
@@ -3092,6 +3104,20 @@
                         "markdownDescription": "The password for the ssh command",
                         "type": "string",
                         "title": "password"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "test": {
+                "title": "test",
+                "markdownDescription": "No description provided",
+                "type": "object",
+                "properties": {
+                    "token_auth": {
+                        "title": "token_auth"
+                    },
+                    "formValues": {
+                        "title": "formValues"
                     }
                 },
                 "additionalProperties": false

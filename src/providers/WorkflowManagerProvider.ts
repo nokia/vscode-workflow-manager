@@ -2266,6 +2266,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					"Cache-Control": "no-cache",
 					'Authorization': 'Bearer ' + token
 				});
+
+				this.pluginLogs.info('url: ' + 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action-execution')
 				let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action-execution'
 				let response: any = await this._callNSP(url, { 
 					method: 'POST', 
@@ -2279,12 +2281,16 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					)
 				});
 				let data = await response.json();
+				
+				this.pluginLogs.info('data: ' + data)
 				let result = data.response.data[0].output.result;
+				let jsonString = JSON.stringify(result, null, 2); // The `null, 2` arguments are optional, for pretty-printing
+				
 
 				const auxVar = await vscode.env.clipboard.readText(); 		// Save the current clipboard content
 				try {
 					let text = editor.document.getText();
-					let newText = text.replace(match[0], result); // copy the new text to the clipboard
+					let newText = text.replace(match[0], jsonString); // copy the new text to the clipboard
 					await vscode.env.clipboard.writeText(newText);
 					await vscode.commands.executeCommand('workbench.files.action.compareWithClipboard'); // Execute compare with clipboard
 				} catch (error) {
@@ -2310,43 +2316,60 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const content = vscode.window.activeTextEditor?.document.getText();
 
 		// BEST PRACTICE: Check for hardcoded IP addresses
-		let ipAddresses = content.match(/(?:[0-9]{1,3}\.){3}[0-9]{1,3}.*\n/g);
-		if (ipAddresses) { // check for hardcoded IP's
-			ipAddresses.forEach(ip => {
-				let startLine = content.split(ip)[0].split('\n').length - 1;
-				let startChar = content.split(ip)[0].split('\n').pop().length;
-				let endLine = startLine;
-				let endChar = startChar + ip.length;
-				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Avoid hard-coding IP addresses into workflows. Use environments and encrypt credentials.: " + ip, vscode.DiagnosticSeverity.Warning);
+		let ipRegex = /(?:[0-9]{1,3}\.){3}[0-9]{1,3}/g;
+		let lines = content.split('\n');
+
+		lines.forEach((line, lineNumber) => {
+			let match;
+			while ((match = ipRegex.exec(line)) !== null) {
+				let startChar = match.index;
+				let endChar = startChar + match[0].length;
+				let diagnostic = new vscode.Diagnostic(
+					new vscode.Range(lineNumber, startChar, lineNumber, endChar),
+					`WFM - Best Practices: Avoid hard-coding IP addresses into workflows. Use environments and encrypt credentials: ${match[0]}`,
+					vscode.DiagnosticSeverity.Warning
+				);
 				diagnostics.push(diagnostic);
-			});
-		}
+			}
+		});
 
 		// BEST PRACTICE: Check for hardcoded Passwords:
-		let passwords = content.match(/(?:password|passwd|pass|secret|token|auth|authorization|creds|credentials|login):.*\n/gi);
-		if (passwords) { // check for hardcoded passwords
-			passwords.forEach(pwd => {
-				let startLine = content.split(pwd)[0].split('\n').length - 1;
-				let startChar = content.split(pwd)[0].split('\n').pop().length;
-				let endLine = startLine;
-				let endChar = startChar + pwd.length;
-				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Avoid hard-coding passwords into workflows. Use environments and encrypt credentials.", vscode.DiagnosticSeverity.Hint);
-				diagnostics.push(diagnostic);
-			});
-		}
+		let passwordRegex = /(?:password|passwd|pass|secret|token|auth|authorization|creds|credentials|login):.*$/gi;
+		let passwordLines = content.split('\n');
 
-		// BEST PRACTICE: Check for hardcoded usernames:
-		let usernames = content.match(/(?:username|user|login):.*\n/gi);
-		if (usernames) { // check for hardcoded usernames
-			usernames.forEach(user => {
-				let startLine = content.split(user)[0].split('\n').length - 1;
-				let startChar = content.split(user)[0].split('\n').pop().length;
-				let endLine = startLine;
-				let endChar = startChar + user.length;
-				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Avoid hard-coding usernames into workflows. Use environments and encrypt credentials.", vscode.DiagnosticSeverity.Hint);
+		passwordLines.forEach((line, lineNumber) => {
+			let match;
+			while ((match = passwordRegex.exec(line)) !== null) {
+				let startChar = match.index;
+				let endChar = startChar + match[0].length;
+				let diagnostic = new vscode.Diagnostic(
+					new vscode.Range(lineNumber, startChar, lineNumber, endChar),
+					"WFM - Best Practices: Avoid hard-coding passwords into workflows. Use environments and encrypt credentials.",
+					vscode.DiagnosticSeverity.Hint
+				);
 				diagnostics.push(diagnostic);
-			});
-		}
+			}
+		});
+
+
+		// BEST PRACTICE: Check for hardcoded Usernames:
+		let usernameRegex = /(?:username|user|login):.*$/gi;
+		let usernameLines = content.split('\n');
+
+		usernameLines.forEach((line, lineNumber) => {
+			let match;
+			while ((match = usernameRegex.exec(line)) !== null) {
+				let startChar = match.index;
+				let endChar = startChar + match[0].length;
+				let diagnostic = new vscode.Diagnostic(
+					new vscode.Range(lineNumber, startChar, lineNumber, endChar),
+					"WFM - Best Practices: Avoid hard-coding usernames into workflows. Use environments and encrypt credentials.",
+					vscode.DiagnosticSeverity.Hint
+				);
+				diagnostics.push(diagnostic);
+			}
+		});
+
 
 		// BEST PRACTICE: Check for no Workflow Documentation:
 		let uri = vscode.window.activeTextEditor?.document.uri;
@@ -2358,54 +2381,46 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 		
 
-		
 		// BEST PRACTICE: Check for locate_nsp() in the workflow:
-		let locate_nsp = content.match(/<%[\s\S]*locate_nsp\(\)[\s\S]*%>/);
-		if (locate_nsp) {
-			let startLine = content.split(locate_nsp[0])[0].split('\n').length - 1;
-			let startChar = content.split(locate_nsp[0])[0].split('\n').pop().length;
-			let endLine = startLine;
-			let endChar = startChar + locate_nsp[0].length;
-			let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Use Kubernetes service names instead of locate_nsp() which takes too long to evaluate", vscode.DiagnosticSeverity.Warning);
+		let locateNspRegex = /<%[\s\S]*locate_nsp\(\)[\s\S]*%>/g;
+		let locateNspMatch;
+		while ((locateNspMatch = locateNspRegex.exec(content)) !== null) {
+			let lineNumber = content.slice(0, locateNspMatch.index).split('\n').length - 1;
+			let startChar = locateNspMatch.index - content.lastIndexOf('\n', locateNspMatch.index) - 1;
+			let endChar = startChar + locateNspMatch[0].length;
+			let diagnostic = new vscode.Diagnostic(
+				new vscode.Range(lineNumber, startChar, lineNumber, endChar),
+				"WFM - Best Practices: Use Kubernetes service names instead of locate_nsp() which takes too long to evaluate",
+				vscode.DiagnosticSeverity.Warning
+			);
 			diagnostics.push(diagnostic);
 		}
+
 
 		// BEST PRACTICE: Check for output-on-error:
 		let outputOnError = content.match(/output-on-error:/g);
 		let output = content.match(/output:/g);
-		if (output && outputOnError) {
-			output.forEach((out, index) => {
-				if (outputOnError[index] === undefined) {
-					let startLine = content.split(out)[0].split('\n').length - 1;
-					let startChar = content.split(out)[0].split('\n').pop().length;
-					let endLine = startLine;
-					let endChar = startChar + out.length;
-					let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Add support for output and output-on-error to simplify result processing", vscode.DiagnosticSeverity.Warning);
-					diagnostics.push(diagnostic);
-				}
-			});
+		if (output && !outputOnError) {
+			let startLine = content.split("output:")[0].split('\n').length - 1;
+			let startChar = content.split("output:")[0].split('\n').pop().length;
+			let endLine = startLine;
+			let endChar = startChar + "output:".length;
+			let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Add support for output and output-on-error to simplify result processing", vscode.DiagnosticSeverity.Warning);
+			diagnostics.push(diagnostic);
 		}
 
 		// BEST PRACTICE: Do not use special characters in the workflow or artifact name. These will cause issues when executed using the API
 		let filename = vscode.window.activeTextEditor?.document.fileName.split('/').pop().split('.')[0].toString();
 		let workflowName = filename + ':';
-		let specialChars = workflowName.match(/[^a-zA-Z0-9_]/g);
-		if (specialChars) {
+		
+		// no special chars is anything other than numbers and letters or :
+		let specialCharsPattern = /[^a-zA-Z0-9:]/;
+		if (specialCharsPattern.test(workflowName)) {
 			let startLine = content.split(workflowName)[0].split('\n').length - 1;
 			let startChar = content.split(workflowName)[0].split('\n').pop().length;
 			let endLine = startLine;
 			let endChar = startChar + workflowName.length;
 			let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Do not use special characters in the workflow or artifact name. These will cause issues when executed using the API", vscode.DiagnosticSeverity.Warning);
-			diagnostics.push(diagnostic);
-		}
-
-
-		// BEST PRACTICE: Incorporate version control, use semantic versioning (SemVer): {major}.{minor}	
-		let firstLines = content.split(filename + ':')[0].split('\n'); // get all lines before workflow name:
-		let regex = /version:\s*'(\d+\.\d+(\.\d+)?)'/;
-		let version = firstLines.join('\n').match(regex);
-		if (!version) {
-			let diagnostic = new vscode.Diagnostic(new vscode.Range(0, 0, 0, 10), "WFM - Best Practices: Incorporate version control, use semantic versioning (SemVer): {major}.{minor}", vscode.DiagnosticSeverity.Warning);
 			diagnostics.push(diagnostic);
 		}
 
@@ -2426,17 +2441,23 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 
 		// BEST PRACTICE: Use nsp.https instead of std.http
-		let httpActions = content.match(/std.http/g);
+		let httpActions = content.match(/std\.http/g);
 		if (httpActions) {
-			httpActions.forEach(action => {
-				let startLine = content.split(action)[0].split('\n').length - 1;
-				let startChar = content.split(action)[0].split('\n').pop().length;
-				let endLine = startLine;
-				let endChar = startChar + action.length;
-				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Use nsp.https instead of std.http", vscode.DiagnosticSeverity.Warning);
+			let actionRegex = /std\.http/g;
+			let match;
+			while ((match = actionRegex.exec(content)) !== null) {
+				let lineNumber = content.slice(0, match.index).split('\n').length - 1;
+				let startChar = match.index - content.lastIndexOf('\n', match.index) - 1;
+				let endChar = startChar + match[0].length;
+				let diagnostic = new vscode.Diagnostic(
+					new vscode.Range(lineNumber, startChar, lineNumber, endChar),
+					"WFM - Best Practices: Use nsp.https instead of std.http",
+					vscode.DiagnosticSeverity.Warning
+				);
 				diagnostics.push(diagnostic);
-			});
+			}
 		}
+
 
 		const yaml = require('yaml');
 		const yamlDoc = yaml.parse(content);
@@ -2483,17 +2504,22 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 
 		// BEST PRACTICE: Avoid using vars that take too long to evaluate. Long evaluating vars will 
-		// timeout after 60s. Remove them from the definition and define then as part of some task.
-		const varsRegex = /vars:\s*[\s\S]*\n/g;
-		const varsMatch = content.match(varsRegex);
-		if (varsMatch) {
-			let startLine = content.split(varsMatch[0])[0].split('\n').length - 1;
-			let startChar = content.split(varsMatch[0])[0].split('\n').pop().length;
-			let endLine = startLine;
-			let endChar = startChar + varsMatch[0].length;
-			let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Avoid using vars that take too long to evaluate. Long evaluating vars will timeout after 60s. Remove them from the definition and define then as part of some task.", vscode.DiagnosticSeverity.Hint);
-			diagnostics.push(diagnostic);
-		}
+		// timeout after 60s. Remove them from the definition and define them as part of some task.
+		const varsRegex = /vars:\s*[\s\S]*$/gm;
+		lines.forEach((line, lineNumber) => {
+			let match;
+			while ((match = varsRegex.exec(line)) !== null) {
+				let startChar = match.index;
+				let endChar = startChar + match[0].length;
+				let diagnostic = new vscode.Diagnostic(
+					new vscode.Range(lineNumber, startChar, lineNumber, endChar),
+					"WFM - Best Practices: Avoid using vars that take too long to evaluate. Long evaluating vars will timeout after 60s. Remove them from the definition and define them as part of some task.",
+					vscode.DiagnosticSeverity.Hint
+				);
+				diagnostics.push(diagnostic);
+			}
+		});
+
 
 		if (vscode.window.activeTextEditor) { // Set the diagnostics in the collection
 			bestPracticesDiagnostics.set(vscode.window.activeTextEditor.document.uri, diagnostics);
