@@ -2526,21 +2526,27 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		}
 	}
 
+	// FIND AN ALTERNATE WAY OTHER THAN ICON: If thers another option, maybe rihgt clicking a problem to remove them
+	// right click on a file, and remove problems from that file, using a conditional, if it has problems
 	/**
 	 * Method to delete vscode problems from a diagnostic collections, for a workflow
 	 * @param {vscode.DiagnosticCollection} bestPracticesDiagnostics
 	*/
-	async clearProblems(bestPracticesDiagnostics: vscode.DiagnosticCollection): Promise<void> {
-		this.pluginLogs.info("Removing Diagnostics Collection");
-	
-		let uri = vscode.window.activeTextEditor?.document.uri;
-		let docUri = uri?.toString().replace(uri?.path.split('/').pop(), 'README.md');
-		bestPracticesDiagnostics.delete(uri); // Remove diagnostics for the current document
-		bestPracticesDiagnostics.delete(vscode.Uri.parse(docUri)); // Remove diagnostics for the README file if it exists
-	}
+	async clearProblems(bestPracticesDiagnostics: vscode.DiagnosticCollection, uri: vscode.Uri): Promise<void> {
+		this.pluginLogs.info("Removing Diagnostics Collection. URI: " + uri.toString());
+		
+		let path = uri.path
+		const fileName = path.split('/').pop() || '';
+		let yamlDefUri = vscode.Uri.parse(uri.toString() + "/" + fileName + ".yaml")
+		let docUri = vscode.Uri.parse(uri.toString() + "/README.md")
+		this.pluginLogs.info(yamlDefUri.toString())
+		this.pluginLogs.info(docUri.toString())
+		bestPracticesDiagnostics.delete(yamlDefUri)
+		bestPracticesDiagnostics.delete(docUri)
+	}	
 	
 
-	// vscode.FileSystemProvider implementation ----------------
+	// ----------------- vscode.FileSystemProvider implementation ----------------
 	/**
 	 * vsCode.FileSystemProvider method to read directory entries.
 	 * WorkflowManagerProvider uses this as main method to pull data from WFM
