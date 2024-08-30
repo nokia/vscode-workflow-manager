@@ -1425,7 +1425,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 			html=html+`</div></section>`;
 			i=i+1;
-			this.pluginLogs.info(JSON.stringify(publish, undefined, 4));
+			//this.pluginLogs.info(JSON.stringify(publish, undefined, 4));
 		});
 		html=html+`</body></html>`;
 		return html;
