@@ -105,7 +105,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.workflow_folders = {};
 
 		// Instantiate the pluginLogs output channel
-		this.pluginLogs = vscode.window.createOutputChannel('NSP Client (plugin logs)', {log: true});
+		this.pluginLogs = vscode.window.createOutputChannel('WFM Plugin Logs', {log: true});
 
 		// used for FileDecorator        
 		this._eventEmiter = new vscode.EventEmitter(); // Event emitter for file decorations
@@ -520,7 +520,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to write a Jinja Template to NSP
 	 * @param {string} name - fileName of the file to be written
 	 * @param {string} data - data to be written to the file
-	 */
+	*/
 	private async _writeTemplate(name: string, data: string): Promise<void> {
 		this.pluginLogs.info('[WFM]: writeTemplate()'); // when adding a file if the file does not end with .jinja throw a vscode error and return
 		if (!name.endsWith('.jinja')) { // if the newName does not end with .yaml throw a vscode error and return
@@ -573,7 +573,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			method: 'PUT',
 			body: data
 		});
-		if (!response){
+
+		if (!response) {
 			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 		}
 
@@ -1430,6 +1431,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		return html;
 	}
 
+
 	/**
 	 * Method to validate workflows, actions and templates in the editor
 	*/
@@ -1647,14 +1649,14 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 						workflow_name: wfnm,
 						description: "workflow execution from vsCode",
 						input: attribjs
-						}
+					}
 				)
 			});
 			if (!wfm_response){
 				throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
 			}
 
-				data = await wfm_response.json();
+			data = await wfm_response.json();
 
 			let execid = data.response.data[0].id;
 			vscode.window.showInformationMessage('Workflow '+wfnm+' execution sent',"See in WFM","Cancel").then((selectedItem) => {
@@ -2138,14 +2140,419 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		});
 	}
 
-	// vscode.FileSystemProvider implementation ----------------
+	/* 
+	// TEST: testTemplate
+	 * Click the run icon on on templates in the editor
+	 * Method to test a template in WFM and compare template result with with template in a
+	 * compare with clipboard view in VsCode.
+	*/
+	async testTemplate(): Promise<void> {
+		this.pluginLogs.info('[WFM]: testTemplate()');
 
+		const uri = vscode.window.activeTextEditor?.document.uri.toString();
+		let filename = uri.split('/').pop().split('.')[0].toString();
+
+		let templateInput = {
+			name: filename,
+			data: {}
+		}
+
+		let input = await vscode.window.showInputBox({
+			placeHolder: JSON.stringify(templateInput),
+			prompt: 'Enter the input for the template',
+			value: "{}"
+		});
+
+		templateInput.data = await JSON.parse(input);
+		this.pluginLogs.info('templateInput: ' + JSON.stringify(templateInput));
+
+		// get auth-token
+		await this._getAuthToken();
+		const token = await this.authToken;
+		if (!token) {
+			throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+		}
+
+		const requestHeaders = new fetch.Headers({
+			"Content-Type": "application/json",
+			"Cache-Control": "no-cache",
+			'Authorization': 'Bearer ' + token
+		});
+
+		let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action-execution'
+		let response: any = await this._callNSP(url, { 
+			method: 'POST', 
+			headers: requestHeaders,
+			body: JSON.stringify(
+				{
+					name: "nsp.jinja_template",
+					id: "1ba6dfb6-3d67-4a65-ba92-5db89842a503",
+					description: "Executing Action nsp.jinja_template from VsCode",
+					input: templateInput
+				}
+			)
+		});
+
+		this.pluginLogs.info('response: ' + response);
+
+		if (!response) {
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
+		let data = await response.json();
+		let templateResult = data.response.data[0].output.result.template;
+		this.pluginLogs.info('templateResult: ' + templateResult);
+
+		const auxVar = await vscode.env.clipboard.readText(); 		// Save the current clipboard content
+		try {
+			await vscode.env.clipboard.writeText(templateResult); // Copy template execution result to the clipboard
+			await vscode.commands.executeCommand('workbench.files.action.compareWithClipboard'); // Execute compare with clipboard
+		} catch (error) {
+			vscode.window.showErrorMessage('Error during clipboard comparison: ' + error);
+		} 
+		await vscode.env.clipboard.writeText(auxVar); // Step 4: Restore the original clipboard content
+	}
+
+	// have a window that asks to review the expression for changes, for something called data etc...
+	// TEST YAQALATOR:
+	// 1. highlight a yaql expression in a yaml file use :<% locate_nsp() %> (in "cleanup_WFM.yaml")
+	// 2. right-click and select run yaqalator
+	// 3. enter context for test use nothing, just {}
+	// 4. the result will be in nsp_client logs
+	/*
+	 * Method to execute a yaql expression in WFM
+	*/
+	async yaqalator(): Promise<void> {
+		this.pluginLogs.info('[WFM]: yaqalator()');
+
+		const editor = vscode.window.activeTextEditor;
+		const selection = editor.selection;
+		if (selection && !selection.isEmpty) {
+			const selectionRange = new vscode.Range(selection.start.line, selection.start.character, selection.end.line, selection.end.character);
+			const highlighted = editor.document.getText(selectionRange);
+			const regex = /<%[\s\S]*%>/;
+			const match = regex.exec(highlighted);
+			if (match) {
+				this.pluginLogs.info("matched: " + match[0]);
+				let yaqlExpression = match[0].replace(/<%|%>/g, '');
+				this.pluginLogs.info("yaqlExpression: " + yaqlExpression);
+
+				// make a pop-up window here: allowing use rto modify the expression:
+				let newYaqlExpression = await vscode.window.showInputBox({
+					placeHolder: "YAQL Expression Selected: " + yaqlExpression,
+					prompt: "Modify YAQL Expression if needed",
+					value: yaqlExpression
+				});
+
+				yaqlExpression = newYaqlExpression ? newYaqlExpression : yaqlExpression;
+
+				// allow the user to enter input for the yaql expression
+				let input = await vscode.window.showInputBox({
+					placeHolder: "Enter the context for the yaql expression",
+					prompt: "Enter the context for the yaql expression",
+					value: "{}"
+				});
+
+				let jsonInput = await JSON.parse(input);
+
+				// get auth-token
+				await this._getAuthToken();
+				const token = await this.authToken;
+				if (!token) {
+					throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+				}
+
+				const requestHeaders = new fetch.Headers({
+					"Content-Type": "application/json",
+					"Cache-Control": "no-cache",
+					'Authorization': 'Bearer ' + token
+				});
+
+				this.pluginLogs.info('url: ' + 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action-execution')
+				let url = 'https://'+this.nspAddr+':'+this.port+'/wfm/api/v1/action-execution'
+				let response: any = await this._callNSP(url, { 
+					method: 'POST', 
+					headers: requestHeaders,
+					body: JSON.stringify(
+						{
+							name: "nsp.yaql_eval",
+							description: "Executing Action nsp.yaql_eval from VsCode",
+							input: {context: jsonInput, expression: yaqlExpression}
+						}
+					)
+				});
+				let data = await response.json();
+				
+				this.pluginLogs.info('data: ' + data)
+				let result = data.response.data[0].output.result;
+				let jsonString = JSON.stringify(result, null, 2); // The `null, 2` arguments are optional, for pretty-printing
+				
+
+				const auxVar = await vscode.env.clipboard.readText(); 		// Save the current clipboard content
+				try {
+					let text = editor.document.getText();
+					let newText = text.replace(match[0], jsonString); // copy the new text to the clipboard
+					await vscode.env.clipboard.writeText(newText);
+					await vscode.commands.executeCommand('workbench.files.action.compareWithClipboard'); // Execute compare with clipboard
+				} catch (error) {
+					vscode.window.showErrorMessage('Error during clipboard comparison: ' + error);
+				} 
+				await vscode.env.clipboard.writeText(auxVar); // Step 4: Restore the original clipboard content
+			} else {
+				vscode.window.showErrorMessage('Select a valid yaql expression surrounded by <% and %>');
+			}
+		}
+	}
+
+	/**
+	 * Method to scan a workflow and warn users/recommend best practices according to: 
+	 * https://network.developer.nokia.com/learn/24_4/network-programmability-automation-frameworks/workflow-manager-framework/wfm-workflow-development/wfm-best-practices/
+	 * @param {vscode.DiagnosticCollection} bestPracticesDiagnostics
+	*/
+	async runBestPractices(bestPracticesDiagnostics: vscode.DiagnosticCollection): Promise<void> {
+		this.pluginLogs.info('[WFM]: runBestPractices()');
+
+		bestPracticesDiagnostics.clear(); // clear any previous diagnostics
+		let diagnostics: vscode.Diagnostic[] = [];
+		const content = vscode.window.activeTextEditor?.document.getText();
+
+		// BEST PRACTICE: Check for hardcoded IP addresses
+		let ipRegex = /(?:[0-9]{1,3}\.){3}[0-9]{1,3}/g;
+		let lines = content.split('\n');
+
+		lines.forEach((line, lineNumber) => {
+			let match;
+			while ((match = ipRegex.exec(line)) !== null) {
+				let startChar = match.index;
+				let endChar = startChar + match[0].length;
+				let diagnostic = new vscode.Diagnostic(
+					new vscode.Range(lineNumber, startChar, lineNumber, endChar),
+					`WFM - Best Practices: Avoid hard-coding IP addresses into workflows. Use environments and encrypt credentials: ${match[0]}`,
+					vscode.DiagnosticSeverity.Warning
+				);
+				diagnostics.push(diagnostic);
+			}
+		});
+
+		// BEST PRACTICE: Check for hardcoded Passwords:
+		let passwordRegex = /(?:password|passwd|pass|secret|token|auth|authorization|creds|credentials|login):.*$/gi;
+		let passwordLines = content.split('\n');
+
+		passwordLines.forEach((line, lineNumber) => {
+			let match;
+			while ((match = passwordRegex.exec(line)) !== null) {
+				let startChar = match.index;
+				let endChar = startChar + match[0].length;
+				let diagnostic = new vscode.Diagnostic(
+					new vscode.Range(lineNumber, startChar, lineNumber, endChar),
+					"WFM - Best Practices: Avoid hard-coding passwords into workflows. Use environments and encrypt credentials.",
+					vscode.DiagnosticSeverity.Hint
+				);
+				diagnostics.push(diagnostic);
+			}
+		});
+
+
+		// BEST PRACTICE: Check for hardcoded Usernames:
+		let usernameRegex = /(?:username|user|login):.*$/gi;
+		let usernameLines = content.split('\n');
+
+		usernameLines.forEach((line, lineNumber) => {
+			let match;
+			while ((match = usernameRegex.exec(line)) !== null) {
+				let startChar = match.index;
+				let endChar = startChar + match[0].length;
+				let diagnostic = new vscode.Diagnostic(
+					new vscode.Range(lineNumber, startChar, lineNumber, endChar),
+					"WFM - Best Practices: Avoid hard-coding usernames into workflows. Use environments and encrypt credentials.",
+					vscode.DiagnosticSeverity.Hint
+				);
+				diagnostics.push(diagnostic);
+			}
+		});
+
+
+		// BEST PRACTICE: Check for no Workflow Documentation:
+		let uri = vscode.window.activeTextEditor?.document.uri;
+		let docUri = uri?.toString().replace(uri?.path.split('/').pop(), 'README.md');
+		let docContent = await this.readFile(vscode.Uri.parse(docUri));
+		if (!docContent || docContent.toString().trim() === "") {
+			let diagnostic = new vscode.Diagnostic(new vscode.Range(0, 0, 0, 0), "WFM - Best Practices: No documentation found for the workflow: Add documentation: What’s the use-case? What are the workflow parameters? Pre-requisites? Supported Releases?", vscode.DiagnosticSeverity.Warning);
+			bestPracticesDiagnostics.set(vscode.Uri.parse(docUri), [diagnostic]); // apply to documentation file
+		}
+		
+
+		// BEST PRACTICE: Check for locate_nsp() in the workflow:
+		let locateNspRegex = /<%[\s\S]*locate_nsp\(\)[\s\S]*%>/g;
+		let locateNspMatch;
+		while ((locateNspMatch = locateNspRegex.exec(content)) !== null) {
+			let lineNumber = content.slice(0, locateNspMatch.index).split('\n').length - 1;
+			let startChar = locateNspMatch.index - content.lastIndexOf('\n', locateNspMatch.index) - 1;
+			let endChar = startChar + locateNspMatch[0].length;
+			let diagnostic = new vscode.Diagnostic(
+				new vscode.Range(lineNumber, startChar, lineNumber, endChar),
+				"WFM - Best Practices: Use Kubernetes service names instead of locate_nsp() which takes too long to evaluate",
+				vscode.DiagnosticSeverity.Warning
+			);
+			diagnostics.push(diagnostic);
+		}
+
+
+		// BEST PRACTICE: Check for output-on-error:
+		let outputOnError = content.match(/output-on-error:/g);
+		let output = content.match(/output:/g);
+		if (output && !outputOnError) {
+			let startLine = content.split("output:")[0].split('\n').length - 1;
+			let startChar = content.split("output:")[0].split('\n').pop().length;
+			let endLine = startLine;
+			let endChar = startChar + "output:".length;
+			let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Add support for output and output-on-error to simplify result processing", vscode.DiagnosticSeverity.Warning);
+			diagnostics.push(diagnostic);
+		}
+
+		// BEST PRACTICE: Do not use special characters in the workflow or artifact name. These will cause issues when executed using the API
+		let filename = vscode.window.activeTextEditor?.document.fileName.split('/').pop().split('.')[0].toString();
+		let workflowName = filename + ':';
+		
+		// no special chars is anything other than numbers and letters or :
+		let specialCharsPattern = /[^a-zA-Z0-9:]/;
+		if (specialCharsPattern.test(workflowName)) {
+			let startLine = content.split(workflowName)[0].split('\n').length - 1;
+			let startChar = content.split(workflowName)[0].split('\n').pop().length;
+			let endLine = startLine;
+			let endChar = startChar + workflowName.length;
+			let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Do not use special characters in the workflow or artifact name. These will cause issues when executed using the API", vscode.DiagnosticSeverity.Warning);
+			diagnostics.push(diagnostic);
+		}
+
+
+		// BEST PRACTICE: Check for REST queries without filters
+		let restQueries = content.match(/https?:\/\/[^\s]+/g);
+		if (restQueries) {
+			restQueries.forEach(query => {
+				if (!query.includes('?')) { // If no query parameters found
+					let startLine = content.split(query)[0].split('\n').length - 1;
+					let startChar = content.split(query)[0].split('\n').pop().length;
+					let endLine = startLine;
+					let endChar = startChar + query.length;
+					let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: REST query found without filters. Apply server-side filtering to reduce data transfer.", vscode.DiagnosticSeverity.Information);
+					diagnostics.push(diagnostic);
+				}
+			});
+		}
+
+		// BEST PRACTICE: Use nsp.https instead of std.http
+		let httpActions = content.match(/std\.http/g);
+		if (httpActions) {
+			let actionRegex = /std\.http/g;
+			let match;
+			while ((match = actionRegex.exec(content)) !== null) {
+				let lineNumber = content.slice(0, match.index).split('\n').length - 1;
+				let startChar = match.index - content.lastIndexOf('\n', match.index) - 1;
+				let endChar = startChar + match[0].length;
+				let diagnostic = new vscode.Diagnostic(
+					new vscode.Range(lineNumber, startChar, lineNumber, endChar),
+					"WFM - Best Practices: Use nsp.https instead of std.http",
+					vscode.DiagnosticSeverity.Warning
+				);
+				diagnostics.push(diagnostic);
+			}
+		}
+
+
+		const yaml = require('yaml');
+		const yamlDoc = yaml.parse(content);
+		let tasks: any = yamlDoc[filename]['tasks'];
+		let tasksList = Object.keys(tasks);
+		
+		for (let i = 0; i < tasksList.length; i++) {
+			let task = tasks[tasksList[i]];
+			let taskName = tasksList[i];
+
+			// BEST PRACTICE: Do not use join with with-items or concurrency in the same task
+			if (task['join'] != undefined && (task['with-items'] != undefined || task['concurrency'] != undefined)) {
+				let startLine = content.split("tasks"+':')[0].split('\n').length - 1;
+				let startChar = content.split("tasks"+':')[0].split('\n').pop().length;
+				let endLine = startLine;
+				let endChar = startChar + "tasks".length;
+				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Do not use join statements in conjunction with with-items & concurrency in the same task. Instead separate the join and the with-items/concurrency into two tasks, create a std.noop task with the join statement first and then have the with-items task run next on-complete of the std.noop task", vscode.DiagnosticSeverity.Warning);
+				diagnostics.push(diagnostic);
+			}
+			
+			// BEST PRACTICE: Do not use std.fail to fail tasks and proceed further in the flow. std.fail fails the entire workflow. Instead use nsp.assert to pass/fail the tasks validation
+			if (task['action'] === 'std.fail') {
+				let startLine = content.split("tasks"+':')[0].split('\n').length - 1;
+				let startChar = content.split("tasks"+':')[0].split('\n').pop().length;
+				let endLine = startLine;
+				let endChar = startChar + "tasks".length;
+				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: Do not use std.fail to fail tasks and proceed further in the flow. std.fail fails the entire workflow. Instead use nsp.assert to pass/fail the tasks validation", vscode.DiagnosticSeverity.Warning);
+				diagnostics.push(diagnostic);
+			}
+
+			// BEST PRACTICE: When a task is reused in multiple branches specifically a task that has a further flow, use a "join: 0" 
+			let taskNameCount = (content.match(new RegExp(taskName, "g")) || []).length;
+			if (taskNameCount > 2)	{	// if taskname comes up more than once in the rest of the content, because first is the taks def and then once, so > 2
+				if (task['join'] === 0) { // check the yaml to make sure join: 0 is aready not there
+					continue;
+				}
+				let startLine = content.split(taskName + ":")[0].split('\n').length - 1;
+				let startChar = content.split(taskName + ":")[0].split('\n').pop().length;
+				let endLine = startLine;
+				let endChar = startChar + taskName.length;
+				let diagnostic = new vscode.Diagnostic(new vscode.Range(startLine, startChar, endLine, endChar), "WFM - Best Practices: When a task is reused in multiple branches specifically a task that has a further flow, use a 'join: 0' on such tasks to make the previewer flow diagram more compact. This does not impact the execution flow", vscode.DiagnosticSeverity.Information);
+				diagnostics.push(diagnostic);
+			}
+		}
+
+		// BEST PRACTICE: Avoid using vars that take too long to evaluate. Long evaluating vars will 
+		// timeout after 60s. Remove them from the definition and define them as part of some task.
+		const varsRegex = /vars:\s*[\s\S]*$/gm;
+		lines.forEach((line, lineNumber) => {
+			let match;
+			while ((match = varsRegex.exec(line)) !== null) {
+				let startChar = match.index;
+				let endChar = startChar + match[0].length;
+				let diagnostic = new vscode.Diagnostic(
+					new vscode.Range(lineNumber, startChar, lineNumber, endChar),
+					"WFM - Best Practices: Avoid using vars that take too long to evaluate. Long evaluating vars will timeout after 60s. Remove them from the definition and define them as part of some task.",
+					vscode.DiagnosticSeverity.Hint
+				);
+				diagnostics.push(diagnostic);
+			}
+		});
+
+
+		if (vscode.window.activeTextEditor) { // Set the diagnostics in the collection
+			bestPracticesDiagnostics.set(vscode.window.activeTextEditor.document.uri, diagnostics);
+		}
+	}
+
+	// FIND AN ALTERNATE WAY OTHER THAN ICON: If thers another option, maybe rihgt clicking a problem to remove them
+	// right click on a file, and remove problems from that file, using a conditional, if it has problems
+	/**
+	 * Method to delete vscode problems from a diagnostic collections, for a workflow
+	 * @param {vscode.DiagnosticCollection} bestPracticesDiagnostics
+	*/
+	async clearProblems(bestPracticesDiagnostics: vscode.DiagnosticCollection, uri: vscode.Uri): Promise<void> {
+		this.pluginLogs.info("Removing Diagnostics Collection. URI: " + uri.toString());
+		
+		let path = uri.path
+		const fileName = path.split('/').pop() || '';
+		let yamlDefUri = vscode.Uri.parse(uri.toString() + "/" + fileName + ".yaml")
+		let docUri = vscode.Uri.parse(uri.toString() + "/README.md")
+		this.pluginLogs.info(yamlDefUri.toString())
+		this.pluginLogs.info(docUri.toString())
+		bestPracticesDiagnostics.delete(yamlDefUri)
+		bestPracticesDiagnostics.delete(docUri)
+	}	
+	
+
+	// ----------------- vscode.FileSystemProvider implementation ----------------
 	/**
 	 * vsCode.FileSystemProvider method to read directory entries.
 	 * WorkflowManagerProvider uses this as main method to pull data from WFM
 	 * while storing it in memory (as cache).
 	 * @param {vscode.Uri} uri URI of the folder to retrieve from NSP
-	 */	
+	*/	
 	async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
 		this.pluginLogs.info("[WFM]: readDirectory("+uri.toString()+")");
 		let url = undefined;
@@ -2255,7 +2662,6 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (path.endsWith('.')) {
 			throw vscode.FileSystemError.FileNotFound('No Permissions!');
 		}
-		
 		
 		if ((path ==='wfm:/') || (path==='wfm:/workflows') || (path==='wfm:/actions') || (path==='wfm:/templates')) {
 			this.pluginLogs.debug("stat("+path+")");

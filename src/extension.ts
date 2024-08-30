@@ -25,6 +25,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const localsave : boolean = config.get("localStorage.enable") ?? false;
 	const localpath : string = config.get("localStorage.folder") ?? "";
 	const fileIgnore : Array<string> = config.get("ignoreTags") ?? [];
+	const bestPracticesDiagnostics = vscode.languages.createDiagnosticCollection('[WFM]: bestPractices: ' + "https://network.developer.nokia.com/learn/24_4/network-programmability-automation-frameworks/workflow-manager-framework/wfm-workflow-development/wfm-best-practices/");
 
 	const wfmProvider = new WorkflowManagerProvider(server, username, secretStorage, port, localsave, localpath, timeout, fileIgnore);
 	
@@ -70,6 +71,23 @@ export function activate(context: vscode.ExtensionContext) {
 	// generate input form for workflow view
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.generateForm', async () => {
 		wfmProvider.generateForm();
+	}));
+
+	// // --- A handler to Test/Execute a Jinja Template when the user clicks the test button
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.testTemplate', async () => {
+		wfmProvider.testTemplate();
+	}));
+
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.yaqalator', async () => {
+		wfmProvider.yaqalator();
+	}));
+
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.runBestPractices', async () => {
+		wfmProvider.runBestPractices(bestPracticesDiagnostics);
+	}));
+
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.clearProblems', async (resource: vscode.Uri) => {
+		wfmProvider.clearProblems(bestPracticesDiagnostics, resource);
 	}));
 
 	// // Generate schema for validation
@@ -140,7 +158,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	
-	  // checks if the workspace folder is nsp-workflow and hides the examples button
+	// checks if the workspace folder is nsp-workflow and hides the examples button
 	vscode.workspace.onDidChangeWorkspaceFolders(async () => {
 		const workspaceFolders =  vscode.workspace.workspaceFolders ?  vscode.workspace.workspaceFolders : [];
 		if (workspaceFolders.find( ({name}) => name === 'nsp-workflow')) {

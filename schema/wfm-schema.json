@@ -1,0 +1,3191 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "definitions": {
+        "workflow": {
+            "type": "object",
+            "properties": {
+                "version": {
+                    "title": "Workflow version (WFM)",
+                    "markdownDescription": "Version of the workflow. Semantic versioning pattern must be used. *Optional*.",
+                    "type": "string",
+                    "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$",
+                    "examples": ["1.0.0"]
+                },
+                "type": {
+                    "title": "Workflow type",
+                    "markdownDescription": "Either `direct` or `reverse`. *Optional*.\\\nDefault: `direct`",
+                    "type": "string",
+                    "default": "direct",
+                    "enum": ["direct", "reverse"]
+                },
+                "description": {
+                    "title": "Workflow description",
+                    "markdownDescription": "Arbitrary text containing workflow description. *Optional*.",
+                    "type": "string"
+                },
+                "tags": {
+                    "title": "Workflow tags",
+                    "markdownDescription": "List of predefined and custom tags associated with this workflow. *Optional*.",
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array",
+                    "examples": ["LSO"]
+                },
+                "workflow_meta":{
+                    "title": "",
+                    "markdownDescription": "",
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "title": "Workflow meta title",
+                            "markdownDescription": "Workflow Title.",
+                            "type": "string"
+                        },
+                        "author": {
+                            "title": "Workflow author.",
+                            "markdownDescription": "Author of the workflow.",
+                            "type": "string",
+                            "examples": ["LSO RnD team"]
+                        },
+                        "signature": {
+                            "title": "Workflow signature.",
+                            "markdownDescription": "Signature of the workflow."
+                        },
+                        "version": {
+                            "title": "Version of the workflow.",
+                            "markdownDescription": "Version of the workflow. Semantic versioning pattern must be used. *Optional*.",
+                            "type": "string",
+                            "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$",
+                            "examples": ["1.0.0"]
+                        },
+                        "license": {
+                            "title": "Workflow license",
+                            "markdownDescription": "Workflow license. *Optional*."
+                        },
+                        "package": {
+                            "title": "Package identifier.",
+                            "markdownDescription": "Package identifier. Example: *LSOM NE Restore*.",
+                            "type": "string",
+                            "examples": ["LSOM NE Restore"]
+                        },
+                        "deprecated": {
+                            "title": "Is it deprecated",
+                            "markdownDescription": "Is it deprecated. *Boolean*.",
+                            "type": "boolean",
+                            "examples": [true, false]
+                        },
+                        "urls": {
+                            "title": "URLs",
+                            "markdownDescription": "URLs associated with the workflow.",
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "title": "URL type",
+                                    "markdownDescription": "URL type.",
+                                    "type": "string",
+                                    "examples": ["git"]
+                                }
+                            }
+                        },
+                        "dependencies":{
+                            "title": "Workflow platform or nodal dependencies",
+                            "markdownDescription": "Dependencies to particular nodal releases of NSP/NFM-P releases",
+                            "type":"object",
+                            "properties": {
+                                "platform":{
+                                    "title": "Platform NSP or NFM-P releases.",
+                                    "markdownDescription": "Platform NSP or NFM-P releases.",
+                                    "type":"object",
+                                    "properties": {
+                                        "nfmpOS":{
+                                            "type":"array"
+                                        },
+                                        "nfmp":{
+                                            "type":"array"
+                                        },
+                                        "nspOS":{
+                                            "type":"array"
+                                        }
+                                    },
+                                    "additionalProperties": false
+                                },
+                                "nodal":{
+                                    "title": "Nodal dependencies",
+                                    "markdownDescription": "Nodal dependencies",
+                                    "type": "array",
+                                    "examples": ["\t- type: 'Nokia 7x50'\n\t  releases: ['19.10','20.x','21.x','22.x']\n\t  mgmtmode: ['model-driven', 'mixed']"]
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "input": {
+                    "title": "Workflow input",
+                    "markdownDescription": "List defining required input parameter names and optionally their default values in a form `my_param: 123`. *Optional*.",
+                    "type": "array",
+                    "items": {
+                        "type": ["string", "object"],
+                        "patternProperties": {
+                            "^[a-zA-Z].*$": {}
+                        },
+                        "pattern": "^[a-zA-Z].*$",
+                        "additionalProperties": false
+                    }
+                },
+                "vars": {
+                    "title": "Workflow variables (WFM)",
+                    "markdownDescription": "Any data structure arbitrarily containing YAQL/Jinja2 expressions that is used as additional workflow input. *Optional*.",
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-zA-Z].*$": {}
+                    },
+                    "additionalProperties": false
+                },                
+                "output": {
+                    "title": "Workflow output",
+                    "markdownDescription": "Any data structure arbitrarily containing YAQL/Jinja2 expressions that defines workflow output. May be nested. *Optional*.",
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-zA-Z].*$": {}
+                    },
+                    "additionalProperties": false
+                },
+                "output-on-error": {
+                    "title": "Workflow error-output",
+                    "markdownDescription": "Any data structure arbitrarily containing YAQL/Jinja2 expressions that defines output of a workflow to be returned if it goes into error state. May be nested. *Optional*.",
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-zA-Z].*$": {}
+                    },
+                    "additionalProperties": false
+                },
+                "task-defaults": {
+                    "title": "Task defaults",
+                    "markdownDescription": "Enables developers to set some task attributes default at workflow level. *Optional*. Corresponding attribute defined for a specific task always takes precedence.",
+                    "type": "object"
+                },
+                "tasks": {
+                    "title": "Workflow tasks",
+                    "markdownDescription": "Task names must not be equal to `noop`, `fail`, `succeed` or `pause`.",
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-zA-Z].*$": {
+                            "$ref": "#/definitions/task"
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false,
+            "required": ["tasks"]
+        },
+        "task": {
+            "title": "Workflow task",
+            "markdownDescription": "Defines specific computational step in the workflow. Each task can optionally take input data and produce output. Tasks can be associated with an action or a workflow.",
+            "type": "object",
+            "properties": {
+                "description": {
+                    "title": "Task description",
+                    "markdownDescription": "Arbitrary text containing task description. *Optional*.",
+                    "type": "string"
+                },
+                "action": {
+                    "title": "Action",
+                    "markdownDescription": "Name of the action associated with the task. Can be a static value or an expression. *Mutually exclusive with `workflow`. If neither `action` nor `workflow` are provided, then the action `std.noop` will be used that does nothing.",
+                    "type": "string",
+                    "enum": [
+                        "file.chksumMD5",
+                        "file.chksumSHA256",
+                        "file.read",
+                        "file.remove",
+                        "file.rename",
+                        "file.write",
+                        "folder.create",
+                        "folder.list",
+                        "folder.remove",
+                        "GetNodeDetails",
+                        "lso_processBof",
+                        "lso_processImageFileList",
+                        "lso_processRedundancy",
+                        "lso_transferFilesFromNe",
+                        "lso_transferFilesToNe",
+                        "netconf.configure",
+                        "netconf.getcfg",
+                        "netconf.rpc",
+                        "nsp.assert",
+                        "nsp.cleanUpPolicyAction",
+                        "nsp.cli",
+                        "nsp.diff",
+                        "nsp.environment",
+                        "nsp.exec_update",
+                        "nsp.generatePDF",
+                        "nsp.generic_mediator",
+                        "nsp.GroupCreation",
+                        "nsp.https",
+                        "nsp.https_async",
+                        "nsp.jinja_template",
+                        "nsp.JobCreation",
+                        "nsp.kafka_producer",
+                        "nsp.mdm_cli",
+                        "nsp.netconf",
+                        "nsp.ping",
+                        "nsp.python",
+                        "nsp.shell",
+                        "nsp.sr_cli",
+                        "nsp.sr_cli_v2",
+                        "nsp.textFSM",
+                        "nsp.uploadFile",
+                        "nsp.user_input",
+                        "nspWebUI.intentList",
+                        "nspWebUI.intentTypeList",
+                        "nspWebUI.intentTypeListWithDetails",
+                        "nspWebUI.neList",
+                        "nspWebUI.neListPaged",
+                        "nspWebUI.portList",
+                        "nspWebUI.portListPaged",
+                        "nspWebUI.portNElist",
+                        "nspWebUI.wfList",
+                        "nsp.yaql_eval",
+                        "std.async_noop",
+                        "std.echo",
+                        "std.email",
+                        "std.fail",
+                        "std.http",
+                        "std.javascript",
+                        "std.js",
+                        "std.mistral_http",
+                        "std.noop",
+                        "std.sleep",
+                        "std.ssh",
+                        "std.ssh_proxied",
+                        "std.test_dict",
+                        "std.wait_ssh",
+                        "test",
+                        "yang.compare",
+                        "yang.convert"
+                    ]
+                },
+                "workflow": {
+                    "title": "(Sub-)Workflow",
+                    "markdownDescription": "Name of the workflow associated with the task. Can be a static value or an expression. *Mutually exclusive with `action`. If neither `action` nor `workflow` are provided, then the action `std.noop` will be used that does nothing.",
+                    "type": "string"
+                },
+                "input": {
+                    "title": "Input",
+                    "markdownDescription": "Input parameter values of the action or sub-workflow.",
+                    "type": "object"
+
+                },
+                "publish": {
+                    "title": "Publish",
+                    "markdownDescription": "Variables to publish to the workflow context in case of task execution success. Any JSON-compatible data structure optionally containing expression to select precisely what needs to be published. Published variables will be accessible for downstream tasks using expressions. *Optional*.",
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-zA-Z].*$": {}
+                    },
+                    "additionalProperties": false
+                },
+                "publish-on-error": {
+                    "title": "Publish on Error",
+                    "markdownDescription": "Variables to publish to the workflow context in case of task execution failures. Any JSON-compatible data structure optionally containing expression to select precisely what needs to be published. Published variables will be accessible for downstream tasks using expressions. *Optional*.",
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-zA-Z].*$": {}
+                    },
+                    "additionalProperties": false
+                },
+                "with-items": {
+                    "title": "With items",
+                    "markdownDescription": "Allows to run action or workflow associated with a task multiple times iterating over a provided list of items. *Optional*.",
+                    "type": ["string", "array"],
+                    "pattern": "^.* in <%.*%>$",
+                    "items": {
+                        "type": ["string"],
+                        "pattern": "^.* in <%.*%>$"
+                    }
+                },
+                "keep-result": {
+                    "title": "Keep result",
+                    "markdownDescription": "Allows to disable the storage of action results after task completion (e.g. if they are large and not needed afterwards). *Optional*. By default is `true`.",
+                    "type": "boolean",
+                    "default": true
+                },
+                "target": {
+                    "type": "string"
+                },
+                "pause-before": {
+                    "title": "Pause before",
+                    "markdownDescription": "Put workflow engine on hold before starting the task. *Optional*.",
+                    "type": "boolean"
+                },
+                "wait-before": {
+                    "title": "Wait before",
+                    "markdownDescription": "Defines a delay in seconds that workflow engine should wait after the task has completed before starting next tasks defined in *on-success*, *on-error* or *on-complete*. *Optional*.",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "wait-after": {
+                    "title": "Wait after",
+                    "markdownDescription": "Defines a delay in seconds that workflow engine should wait before starting the task. *Optional*.",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "fail-on": {
+                    "title": "Fail on",
+                    "markdownDescription": "Defines a condition under which the task will fail, even if the action/workflow was completed successfully. *Optional*.",
+                    "type": "string",
+                    "pattern": "^<%.*%>$"
+                },
+                "timeout": {
+                    "title": "Timeout",
+                    "markdownDescription": "Defines a period of time in seconds after which the task/workflow will be failed automatically by engine if it hasn’t completed. *Optional*.",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "retry": {
+                    "title": "Retry Policy",
+                    "markdownDescription": "Defines a pattern how task should be repeated in case of an error. *Optional*.",
+                    "type": "object",
+                    "properties": {
+                        "count": {
+                            "title": "Count",
+                            "markdownDescription": "Defines a maximum number of times that a task can be repeated. *Optional*.",
+                            "type": ["integer","string"],
+                            "minimum": 1,
+                            "pattern": "^<%.*%>$"
+                        },
+                        "delay": {
+                            "title": "Delay",
+                            "markdownDescription": "Defines a delay in seconds between subsequent task iterations. *Optional*.",
+                            "type": ["integer","string"],
+                            "minimum": 1,
+                            "pattern": "^<%.*%>$"
+                        },
+                        "break-on": {
+                            "title": "Break-on",
+                            "markdownDescription": "Defines an expression that will break iteration loop if it evaluates to `true`. If it fires then the task is considered error. *Optional*.",
+                            "type": "string",
+                            "pattern": "^<%.*%>$"
+                        },
+                        "continue-on": {
+                            "title": "Continue-on",
+                            "markdownDescription": "Defines an expression that will continue iteration loop if it evaluates to `true`. If it fires then the task is considered successful. If it evaluates to `false` then policy will break the iteration. *Optional*.",
+                            "type": "string",
+                            "pattern": "^<%.*%>$"
+                        }       
+                    }
+                },
+                "safe-rerun": {
+                    "title": "Safe to rerun",
+                    "markdownDescription": "Allow to rerun task if executor dies during action execution. If set to `true` task may be run twice. *Optional*. By default set to `false`.",
+                    "type": "boolean"
+                },
+                "concurrency": {
+                    "title": "Concurrency (Flow Control)",
+                    "markdownDescription": "Defines a max number of actions or workflows running simultaneously in a task. Applicable only for tasks that have `with-items`. If property is not set then actions (or workflows in case of nested workflows) of the task will be scheduled for execution all at once. *Optional*.",
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "join": {
+                    "title": "Join (Flow Control)",
+                    "markdownDescription": "Allows to synchronize multiple parallel workflow branches and aggregate their data. *Optional*.",
+                    "anyOf": [
+                        {
+                            "type": "string",
+                            "enum": ["all"]
+                        },
+                        {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    ]
+                },
+                "on-success": {
+                    "title": "On-success (Flow Control)",
+                    "markdownDescription": "List of tasks which will run after the task has completed successfully. *Optional*.",
+                    "type": ["array","string"],
+                    "items": {
+                        "type": ["string", "object"],
+                        "patternProperties": {
+                            "^[a-zA-Z].*$": {
+                                "type": "string",
+                                "pattern": "^<%.*%>$"
+                            }
+                        },
+                        "pattern": "^[a-zA-Z].*$",
+                        "additionalProperties": false
+                    }
+                },
+                "on-error": {
+                    "title": "On-error (Flow Control)",
+                    "markdownDescription": "List of tasks which will run after the task has completed with an error. *Optional*.",
+                    "type": ["array","string"],
+                    "items": {
+                        "type": ["string", "object"],
+                        "patternProperties": {
+                            "^[a-zA-Z].*$": {
+                                "type": "string",
+                                "pattern": "^<%.*%>$"
+                            }
+                        },
+                        "pattern": "^[a-zA-Z].*$",
+                        "additionalProperties": false
+                    }
+                },
+                "on-complete": {
+                    "title": "On-complete (Flow Control)",
+                    "markdownDescription": "List of tasks which will run after the task has completed regardless of whether it is successful or not. *Optional*.",
+                    "type": ["array","string"],
+                    "items": {
+                        "type": ["string", "object"],
+                        "patternProperties": {
+                            "^[a-zA-Z].*$": {
+                                "type": "string",
+                                "pattern": "^<%.*%>$"
+                            }
+                        },
+                        "pattern": "^[a-zA-Z].*$",
+                        "additionalProperties": false
+                    }
+                }
+
+            },
+            "additionalProperties": false,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "file.chksumMD5"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/file.chksumMD5"}
+                        },
+                        "title": "file.chksumMD5",                
+                        "markdownDescription": "calculate MD5 checksum"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "file.chksumSHA256"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/file.chksumSHA256"}
+                        },
+                        "title": "file.chksumSHA256",                
+                        "markdownDescription": "calculates SHA256 checksum"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "file.read"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/file.read"}
+                        },
+                        "title": "file.read",                
+                        "markdownDescription": "reads a file from filesystem"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "file.remove"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/file.remove"}
+                        },
+                        "title": "file.remove",                
+                        "markdownDescription": "remove files"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "file.rename"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/file.rename"}
+                        },
+                        "title": "file.rename",                
+                        "markdownDescription": "rename file or folder"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "file.write"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/file.write"}
+                        },
+                        "title": "file.write",                
+                        "markdownDescription": "dump data to file"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "folder.create"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/folder.create"}
+                        },
+                        "title": "folder.create",                
+                        "markdownDescription": "creates a folder"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "folder.list"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/folder.list"}
+                        },
+                        "title": "folder.list",                
+                        "markdownDescription": "list a folder"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "folder.remove"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/folder.remove"}
+                        },
+                        "title": "folder.remove",                
+                        "markdownDescription": "remove a folder"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "GetNodeDetails"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/GetNodeDetails"}
+                        },
+                        "title": "GetNodeDetails",                
+                        "markdownDescription": ""
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "lso_processBof"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/lso_processBof"}
+                        },
+                        "title": "lso_processBof",                
+                        "markdownDescription": "No description provided"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "lso_processImageFileList"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/lso_processImageFileList"}
+                        },
+                        "title": "lso_processImageFileList",                
+                        "markdownDescription": "No description provided"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "lso_processRedundancy"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/lso_processRedundancy"}
+                        },
+                        "title": "lso_processRedundancy",                
+                        "markdownDescription": "No description provided"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "lso_transferFilesFromNe"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/lso_transferFilesFromNe"}
+                        },
+                        "title": "lso_transferFilesFromNe",                
+                        "markdownDescription": "No description provided"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "lso_transferFilesToNe"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/lso_transferFilesToNe"}
+                        },
+                        "title": "lso_transferFilesToNe",                
+                        "markdownDescription": "No description provided"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "netconf.configure"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/netconf.configure"}
+                        },
+                        "title": "netconf.configure",                
+                        "markdownDescription": "Update device configuration using the NETCONF protocol"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "netconf.getcfg"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/netconf.getcfg"}
+                        },
+                        "title": "netconf.getcfg",                
+                        "markdownDescription": "Retrieve configuration action using the NETCONF protocol"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "netconf.rpc"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/netconf.rpc"}
+                        },
+                        "title": "netconf.rpc",                
+                        "markdownDescription": "Executes NETCONF RPC commands on MDM managed or any unmanaged NE"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.assert"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.assert"}
+                        },
+                        "title": "nsp.assert",                
+                        "markdownDescription": "compares two objects"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.cleanUpPolicyAction"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.cleanUpPolicyAction"}
+                        },
+                        "title": "nsp.cleanUpPolicyAction",                
+                        "markdownDescription": "Cleans up old execution results based on policy"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.cli"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.cli"}
+                        },
+                        "title": "nsp.cli",                
+                        "markdownDescription": "Runs Secure Shell (SSH) command(s) on any vendor"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.diff"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.diff"}
+                        },
+                        "title": "nsp.diff",                
+                        "markdownDescription": "compares buffer and generates HTML"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.environment"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.environment"}
+                        },
+                        "title": "nsp.environment",                
+                        "markdownDescription": "read/write NSP workflow manager environment"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.exec_update"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.exec_update"}
+                        },
+                        "title": "nsp.exec_update",                
+                        "markdownDescription": "updates execution description"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.generatePDF"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.generatePDF"}
+                        },
+                        "title": "nsp.generatePDF",                
+                        "markdownDescription": "generates PDF from HTML/CSS"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.generic_mediator"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.generic_mediator"}
+                        },
+                        "title": "nsp.generic_mediator",                
+                        "markdownDescription": "Provides a simplied http action for generic mediator"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.GroupCreation"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.GroupCreation"}
+                        },
+                        "title": "nsp.GroupCreation",                
+                        "markdownDescription": "Provides a simplied async https action for Group Creation"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.https"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.https"}
+                        },
+                        "title": "nsp.https",                
+                        "markdownDescription": "Provides a simplied https action for nsp"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.https_async"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.https_async"}
+                        },
+                        "title": "nsp.https_async",                
+                        "markdownDescription": "Provides a simplied async https action for nsp"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.jinja_template"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.jinja_template"}
+                        },
+                        "title": "nsp.jinja_template",                
+                        "markdownDescription": "Gets and Resolves a Jinja Template"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.JobCreation"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.JobCreation"}
+                        },
+                        "title": "nsp.JobCreation",                
+                        "markdownDescription": "Provides a simplied async https action for Job Creation"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.kafka_producer"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.kafka_producer"}
+                        },
+                        "title": "nsp.kafka_producer",                
+                        "markdownDescription": "Starts a kafka producer on NSP broker and sends message to the provided topic."
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.mdm_cli"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.mdm_cli"}
+                        },
+                        "title": "nsp.mdm_cli",                
+                        "markdownDescription": "Runs CLI commands on a single host managed by MDM"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.netconf"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.netconf"}
+                        },
+                        "title": "nsp.netconf",                
+                        "markdownDescription": "Executes NETCONF RPC commands"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.ping"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.ping"}
+                        },
+                        "title": "nsp.ping",                
+                        "markdownDescription": "checks nodal reachability using ping"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.python"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.python"}
+                        },
+                        "title": "nsp.python",                
+                        "markdownDescription": "Runs python code"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.shell"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.shell"}
+                        },
+                        "title": "nsp.shell",                
+                        "markdownDescription": "executes a shell-level command"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.sr_cli"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.sr_cli"}
+                        },
+                        "title": "nsp.sr_cli",                
+                        "markdownDescription": "(WILL BE DEPRECATED, USE nsp.sr_cli_v2) Runs Secure Shell (SSH) command(s) on provided single or multiple hosts (SRs)"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.sr_cli_v2"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.sr_cli_v2"}
+                        },
+                        "title": "nsp.sr_cli_v2",                
+                        "markdownDescription": "Runs Secure Shell (SSH) command(s) on SR"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.textFSM"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.textFSM"}
+                        },
+                        "title": "nsp.textFSM",                
+                        "markdownDescription": "applies textFSM template to CLI and shell responses"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.uploadFile"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.uploadFile"}
+                        },
+                        "title": "nsp.uploadFile",                
+                        "markdownDescription": "Uploads file to File Service app"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.user_input"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.user_input"}
+                        },
+                        "title": "nsp.user_input",                
+                        "markdownDescription": "Provides an interface for user prompts and input"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nspWebUI.intentList"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nspWebUI.intentList"}
+                        },
+                        "title": "nspWebUI.intentList",                
+                        "markdownDescription": "Queries the list of intents from NSP Intent Manager"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nspWebUI.intentTypeList"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nspWebUI.intentTypeList"}
+                        },
+                        "title": "nspWebUI.intentTypeList",                
+                        "markdownDescription": "Queries the list of intent-types from NSP Intent Manager"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nspWebUI.intentTypeListWithDetails"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nspWebUI.intentTypeListWithDetails"}
+                        },
+                        "title": "nspWebUI.intentTypeListWithDetails",                
+                        "markdownDescription": "Queries the list of intent-types from NSP Intent Manager"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nspWebUI.neList"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nspWebUI.neList"}
+                        },
+                        "title": "nspWebUI.neList",                
+                        "markdownDescription": "Queries the list of NSP managed devices"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nspWebUI.neListPaged"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nspWebUI.neListPaged"}
+                        },
+                        "title": "nspWebUI.neListPaged",                
+                        "markdownDescription": "Provides the list of managed devices with pagination/filtering support"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nspWebUI.portList"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nspWebUI.portList"}
+                        },
+                        "title": "nspWebUI.portList",                
+                        "markdownDescription": "Queries the list of NSP managed ports"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nspWebUI.portListPaged"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nspWebUI.portListPaged"}
+                        },
+                        "title": "nspWebUI.portListPaged",                
+                        "markdownDescription": "Provides the list of physical ports with pagination/filtering support"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nspWebUI.portNElist"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nspWebUI.portNElist"}
+                        },
+                        "title": "nspWebUI.portNElist",                
+                        "markdownDescription": "Queries the list of NSP managed devices"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nspWebUI.wfList"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nspWebUI.wfList"}
+                        },
+                        "title": "nspWebUI.wfList",                
+                        "markdownDescription": "Queries the list of available workflows"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "nsp.yaql_eval"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/nsp.yaql_eval"}
+                        },
+                        "title": "nsp.yaql_eval",                
+                        "markdownDescription": "Provides an evaluator to check YAQL expressions"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "std.async_noop"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/std.async_noop"}
+                        },
+                        "title": "std.async_noop",                
+                        "markdownDescription": "Asynchronous no-operation action"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "std.echo"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/std.echo"}
+                        },
+                        "title": "std.echo",                
+                        "markdownDescription": "Echo action"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "std.email"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/std.email"}
+                        },
+                        "title": "std.email",                
+                        "markdownDescription": "Send Email"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "std.fail"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/std.fail"}
+                        },
+                        "title": "std.fail",                
+                        "markdownDescription": "Always fail action"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "std.http"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/std.http"}
+                        },
+                        "title": "std.http",                
+                        "markdownDescription": "HTTP action"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "std.javascript"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/std.javascript"}
+                        },
+                        "title": "std.javascript",                
+                        "markdownDescription": "Evaluates given JavaScript"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "std.js"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/std.js"}
+                        },
+                        "title": "std.js",                
+                        "markdownDescription": "Evaluates given JavaScript"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "std.mistral_http"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/std.mistral_http"}
+                        },
+                        "title": "std.mistral_http",                
+                        "markdownDescription": "HTTP action"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "std.noop"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/std.noop"}
+                        },
+                        "title": "std.noop",                
+                        "markdownDescription": "No-operation action"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "std.sleep"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/std.sleep"}
+                        },
+                        "title": "std.sleep",                
+                        "markdownDescription": "Sleep action"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "std.ssh"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/std.ssh"}
+                        },
+                        "title": "std.ssh",                
+                        "markdownDescription": "Runs Secure Shell (SSH) command on provided single or multiple hosts"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "std.ssh_proxied"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/std.ssh_proxied"}
+                        },
+                        "title": "std.ssh_proxied",                
+                        "markdownDescription": "SSH Proxied"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "std.test_dict"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/std.test_dict"}
+                        },
+                        "title": "std.test_dict",                
+                        "markdownDescription": "Generates test dict"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "std.wait_ssh"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/std.wait_ssh"}
+                        },
+                        "title": "std.wait_ssh",                
+                        "markdownDescription": "This action sshs to a host and then waits for 10 seconds"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "test"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/test"}
+                        },
+                        "title": "test",                
+                        "markdownDescription": "No description provided"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "yang.compare"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/yang.compare"}
+                        },
+                        "title": "yang.compare",                
+                        "markdownDescription": "model-aware differ"
+                    }
+                },
+                {
+                    "if": {"properties": {"action": {"const": "yang.convert"}},
+                            "required":["action"]},
+                    "then": {
+                        "properties": {
+                            "input": {"$ref": "#/definitions/action-input/yang.convert"}
+                        },
+                        "title": "yang.convert",                
+                        "markdownDescription": "model-aware converter"
+                    }
+                }
+           ]
+        },
+        "action-input": {
+            "file.chksumMD5": {
+                "title": "file.chksumMD5",
+                "markdownDescription": "calculate MD5 checksum",
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "markdownDescription": "File to calculate the checksum",
+                        "type": "string",
+                        "title": "filename"
+                    },
+                    "folder": {
+                        "markdownDescription": "Parent folder",
+                        "type": "string",
+                        "title": "folder"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "file.chksumSHA256": {
+                "title": "file.chksumSHA256",
+                "markdownDescription": "calculates SHA256 checksum",
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "markdownDescription": "File to calculate the checksum",
+                        "type": "string",
+                        "title": "filename"
+                    },
+                    "folder": {
+                        "markdownDescription": "Parent folder",
+                        "type": "string",
+                        "title": "folder"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "file.read": {
+                "title": "file.read",
+                "markdownDescription": "reads a file from filesystem",
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "markdownDescription": "Name of the file",
+                        "type": "string",
+                        "title": "filename"
+                    },
+                    "options": {
+                        "markdownDescription": "Controls the parsing of the content",
+                        "type": "string",
+                        "title": "options"
+                    },
+                    "folder": {
+                        "markdownDescription": "Parent folder",
+                        "type": "string",
+                        "title": "folder"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "file.remove": {
+                "title": "file.remove",
+                "markdownDescription": "remove files",
+                "type": "object",
+                "properties": {
+                    "filenames": {
+                        "markdownDescription": "Files to remove",
+                        "title": "filenames"
+                    },
+                    "folder": {
+                        "markdownDescription": "Parent folder",
+                        "type": "string",
+                        "title": "folder"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "file.rename": {
+                "title": "file.rename",
+                "markdownDescription": "rename file or folder",
+                "type": "object",
+                "properties": {
+                    "old": {
+                        "markdownDescription": "name of the file/folder (old)",
+                        "type": "string",
+                        "title": "old"
+                    },
+                    "new": {
+                        "markdownDescription": "name of the file/folder (new)",
+                        "type": "string",
+                        "title": "new"
+                    },
+                    "mode": {
+                        "markdownDescription": "Mode to rename the file/folder",
+                        "type": "string",
+                        "title": "mode"
+                    },
+                    "folder": {
+                        "markdownDescription": "Parent folder",
+                        "type": "string",
+                        "title": "folder"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "file.write": {
+                "title": "file.write",
+                "markdownDescription": "dump data to file",
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "markdownDescription": "Data to write to the file",
+                        "type": "string",
+                        "title": "data"
+                    },
+                    "filename": {
+                        "markdownDescription": "Name of the file",
+                        "type": "string",
+                        "title": "filename"
+                    },
+                    "mode": {
+                        "markdownDescription": "Mode to open the file",
+                        "type": "string",
+                        "title": "mode"
+                    },
+                    "folder": {
+                        "markdownDescription": "Parent folder",
+                        "type": "string",
+                        "title": "folder"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "folder.create": {
+                "title": "folder.create",
+                "markdownDescription": "creates a folder",
+                "type": "object",
+                "properties": {
+                    "foldername": {
+                        "markdownDescription": "Name of the folder to create",
+                        "type": "string",
+                        "title": "foldername"
+                    },
+                    "mode": {
+                        "markdownDescription": "Mode to create the folder",
+                        "type": "string",
+                        "title": "mode"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "folder.list": {
+                "title": "folder.list",
+                "markdownDescription": "list a folder",
+                "type": "object",
+                "properties": {
+                    "foldername": {
+                        "markdownDescription": "Name of the folder to remove",
+                        "type": "string",
+                        "title": "foldername"
+                    },
+                    "filter": {
+                        "markdownDescription": "Filter",
+                        "type": "string",
+                        "title": "filter"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "folder.remove": {
+                "title": "folder.remove",
+                "markdownDescription": "remove a folder",
+                "type": "object",
+                "properties": {
+                    "foldername": {
+                        "markdownDescription": "Name of the folder to remove",
+                        "type": "string",
+                        "title": "foldername"
+                    },
+                    "mode": {
+                        "markdownDescription": "Mode to remove the folder",
+                        "type": "string",
+                        "title": "mode"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "GetNodeDetails": {
+                "title": "GetNodeDetails",
+                "markdownDescription": "",
+                "type": "object",
+                "properties": {
+                    "neType": {
+                        "title": "neType"
+                    },
+                    "cardType": {
+                        "title": "cardType"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "lso_processBof": {
+                "title": "lso_processBof",
+                "markdownDescription": "No description provided",
+                "type": "object",
+                "properties": {
+                    "showBofResponse": {
+                        "title": "showBofResponse"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "lso_processImageFileList": {
+                "title": "lso_processImageFileList",
+                "markdownDescription": "No description provided",
+                "type": "object",
+                "properties": {
+                    "dir_name": {
+                        "title": "dir_name"
+                    },
+                    "targetSwVersion": {
+                        "title": "targetSwVersion"
+                    },
+                    "platformType": {
+                        "title": "platformType"
+                    },
+                    "chassisType": {
+                        "title": "chassisType"
+                    },
+                    "files": {
+                        "title": "files"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "lso_processRedundancy": {
+                "title": "lso_processRedundancy",
+                "markdownDescription": "No description provided",
+                "type": "object",
+                "properties": {
+                    "checkCpmRedundancy": {
+                        "title": "checkCpmRedundancy"
+                    },
+                    "neTypeMap": {
+                        "title": "neTypeMap"
+                    },
+                    "platformType": {
+                        "title": "platformType"
+                    },
+                    "cardsEquippedType": {
+                        "title": "cardsEquippedType"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "lso_transferFilesFromNe": {
+                "title": "lso_transferFilesFromNe",
+                "markdownDescription": "No description provided",
+                "type": "object",
+                "properties": {
+                    "destinationPath": {
+                        "title": "destinationPath"
+                    },
+                    "sourcePath": {
+                        "title": "sourcePath"
+                    },
+                    "neId": {
+                        "title": "neId"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "lso_transferFilesToNe": {
+                "title": "lso_transferFilesToNe",
+                "markdownDescription": "No description provided",
+                "type": "object",
+                "properties": {
+                    "destinationPath": {
+                        "title": "destinationPath"
+                    },
+                    "sourcePath": {
+                        "title": "sourcePath"
+                    },
+                    "neId": {
+                        "title": "neId"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "netconf.configure": {
+                "title": "netconf.configure",
+                "markdownDescription": "Update device configuration using the NETCONF protocol",
+                "type": "object",
+                "properties": {
+                    "connectInfo": {
+                        "markdownDescription": "Dictionary containing NETCONF connection attributes following ncclient syntax",
+                        "title": "connectInfo"
+                    },
+                    "neId": {
+                        "markdownDescription": "System IP of MDM managed device.",
+                        "type": "string",
+                        "title": "neId"
+                    },
+                    "config": {
+                        "markdownDescription": "The NETCONF edit-config *config* element in XML format.",
+                        "type": "string",
+                        "title": "config"
+                    },
+                    "target": {
+                        "markdownDescription": "target datastore (choice of candidate, running, auto)",
+                        "type": "string",
+                        "title": "target"
+                    },
+                    "options": {
+                        "markdownDescription": "Additional edit-config options following ncclient syntax",
+                        "title": "options"
+                    },
+                    "exclusive": {
+                        "markdownDescription": "lock target datastore during the execution of this operation",
+                        "type": ["boolean", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "exclusive"
+                    },
+                    "dryRun": {
+                        "markdownDescription": "Validate the configuration change by the network device w/o commit",
+                        "type": ["boolean", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "dryRun"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "netconf.getcfg": {
+                "title": "netconf.getcfg",
+                "markdownDescription": "Retrieve configuration action using the NETCONF protocol",
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "markdownDescription": "source datastore",
+                        "type": "string",
+                        "title": "source"
+                    },
+                    "filter": {
+                        "markdownDescription": "subtree or xpath filter",
+                        "type": "string",
+                        "title": "filter"
+                    },
+                    "exclusive": {
+                        "markdownDescription": "lock target datastore during the execution of this operation",
+                        "type": ["boolean", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "exclusive"
+                    },
+                    "connectInfo": {
+                        "markdownDescription": "Dictionary containing NETCONF connection attributes following ncclient syntax",
+                        "title": "connectInfo"
+                    },
+                    "neId": {
+                        "markdownDescription": "System IP of MDM managed device.",
+                        "type": "string",
+                        "title": "neId"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "netconf.rpc": {
+                "title": "netconf.rpc",
+                "markdownDescription": "Executes NETCONF RPC commands on MDM managed or any unmanaged NE",
+                "type": "object",
+                "properties": {
+                    "connectInfo": {
+                        "markdownDescription": "Dictionary containing NETCONF connection attributes following ncclient syntax",
+                        "title": "connectInfo"
+                    },
+                    "neId": {
+                        "markdownDescription": "System IP of MDM managed device.  Either provide neId or connectInfo",
+                        "type": "string",
+                        "title": "neId"
+                    },
+                    "commands": {
+                        "title": "commands"
+                    },
+                    "format": {
+                        "markdownDescription": "The output format.  Valid values are raw or object.",
+                        "title": "format"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.assert": {
+                "title": "nsp.assert",
+                "markdownDescription": "compares two objects",
+                "type": "object",
+                "properties": {
+                    "input": {
+                        "markdownDescription": "Entity to be evaluated",
+                        "type": "string",
+                        "title": "input"
+                    },
+                    "expected": {
+                        "markdownDescription": "Expected Entity",
+                        "title": "expected"
+                    },
+                    "shouldFail": {
+                        "markdownDescription": "Boolean flag to set if the assert should fail on diff",
+                        "type": ["boolean", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "shouldFail"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.cleanUpPolicyAction": {
+                "title": "nsp.cleanUpPolicyAction",
+                "markdownDescription": "Cleans up old execution results based on policy",
+                "type": "object",
+                "properties": {
+                    "policy": {
+                        "markdownDescription": "source datastore",
+                        "title": "policy"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.cli": {
+                "title": "nsp.cli",
+                "markdownDescription": "Runs Secure Shell (SSH) command(s) on any vendor",
+                "type": "object",
+                "properties": {
+                    "cmds": {
+                        "markdownDescription": "commands to execute on device",
+                        "title": "cmds"
+                    },
+                    "host": {
+                        "markdownDescription": "hostname or IP address",
+                        "type": "string",
+                        "title": "host"
+                    },
+                    "username": {
+                        "markdownDescription": "used for authentication",
+                        "type": "string",
+                        "title": "username"
+                    },
+                    "password": {
+                        "markdownDescription": "used for authentication",
+                        "type": "string",
+                        "title": "password"
+                    },
+                    "port": {
+                        "markdownDescription": "tcp port to be used",
+                        "type": ["number", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "port"
+                    },
+                    "private_key_filename": {
+                        "markdownDescription": "path to key file for authentication",
+                        "type": "string",
+                        "title": "private_key_filename"
+                    },
+                    "timeout": {
+                        "markdownDescription": "cmd response timeout",
+                        "type": ["number", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "timeout"
+                    },
+                    "prompt": {
+                        "markdownDescription": "cli prompt, regex. Default is auto determine prompt",
+                        "type": "string",
+                        "title": "prompt"
+                    },
+                    "stopOn": {
+                        "markdownDescription": "regex on command output",
+                        "type": "string",
+                        "title": "stopOn"
+                    },
+                    "resultFilter": {
+                        "markdownDescription": "YAQL expression to filter all cmd output",
+                        "type": "string",
+                        "title": "resultFilter"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.diff": {
+                "title": "nsp.diff",
+                "markdownDescription": "compares buffer and generates HTML",
+                "type": "object",
+                "properties": {
+                    "mode": {
+                        "markdownDescription": "HTML result rendering mode.  Valid values are doc or table.",
+                        "type": "string",
+                        "title": "mode"
+                    },
+                    "fromlines": {
+                        "markdownDescription": "string or list of strings for &#39;from&#39; lines",
+                        "type": "string",
+                        "title": "fromlines"
+                    },
+                    "tolines": {
+                        "markdownDescription": "string or list of strings for &#39;to&#39; lines",
+                        "type": "string",
+                        "title": "tolines"
+                    },
+                    "fromdesc": {
+                        "markdownDescription": "specify from file column header",
+                        "type": "string",
+                        "title": "fromdesc"
+                    },
+                    "todesc": {
+                        "markdownDescription": "specify to file column header",
+                        "type": "string",
+                        "title": "todesc"
+                    },
+                    "context": {
+                        "markdownDescription": "Show contextual differences OR entire file",
+                        "type": ["boolean", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "context"
+                    },
+                    "numlines": {
+                        "markdownDescription": "Controls the number of context lines to be shown",
+                        "type": ["number", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "numlines"
+                    },
+                    "tabsize": {
+                        "markdownDescription": "tab stop spacing",
+                        "type": ["number", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "tabsize"
+                    },
+                    "wrapsize": {
+                        "markdownDescription": "column number where lines are wrapped (default wrapping disabled)",
+                        "type": ["number", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "wrapsize"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.environment": {
+                "title": "nsp.environment",
+                "markdownDescription": "read/write NSP workflow manager environment",
+                "type": "object",
+                "properties": {
+                    "environment": {
+                        "markdownDescription": "Source/target WFM environment",
+                        "type": "string",
+                        "title": "environment"
+                    },
+                    "operation": {
+                        "markdownDescription": "Operation to execute on the selected environment",
+                        "type": "string",
+                        "title": "operation"
+                    },
+                    "entries": {
+                        "markdownDescription": "Key/Value pairs to update the target WFM environment.",
+                        "title": "entries"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.exec_update": {
+                "title": "nsp.exec_update",
+                "markdownDescription": "updates execution description",
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "markdownDescription": "new description",
+                        "type": "string",
+                        "title": "description"
+                    },
+                    "append": {
+                        "markdownDescription": "appends to existing description",
+                        "type": ["boolean", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "append"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.generatePDF": {
+                "title": "nsp.generatePDF",
+                "markdownDescription": "generates PDF from HTML/CSS",
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "markdownDescription": "Name of the PDF file to be created",
+                        "type": "string",
+                        "title": "filename"
+                    },
+                    "folder": {
+                        "markdownDescription": "Parent folder",
+                        "type": "string",
+                        "title": "folder"
+                    },
+                    "html": {
+                        "markdownDescription": "HTML string",
+                        "type": "string",
+                        "title": "html"
+                    },
+                    "css": {
+                        "markdownDescription": "CSS string",
+                        "type": "string",
+                        "title": "css"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.generic_mediator": {
+                "title": "nsp.generic_mediator",
+                "markdownDescription": "Provides a simplied http action for generic mediator",
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "markdownDescription": "name of generic mediator",
+                        "type": "string",
+                        "title": "name"
+                    },
+                    "url": {
+                        "markdownDescription": "NSP API URL",
+                        "type": "string",
+                        "title": "url"
+                    },
+                    "method": {
+                        "markdownDescription": "Method type, one of [GET, POST. PUT, PATCH, DELETE]",
+                        "type": "string",
+                        "title": "method"
+                    },
+                    "contentType": {
+                        "markdownDescription": "Request body data type.  The valid values are application/json and application/xml.",
+                        "type": "string",
+                        "title": "contentType"
+                    },
+                    "accept": {
+                        "markdownDescription": "Response type (application/json, text/plain), can be filtered and stored",
+                        "type": "string",
+                        "title": "accept"
+                    },
+                    "body": {
+                        "markdownDescription": "The request body.  This must match the contentType field.  By default it is assumed to be consistent with application/json.",
+                        "type": "string",
+                        "title": "body"
+                    },
+                    "fileName": {
+                        "markdownDescription": "Save result to file (full path required)",
+                        "type": "string",
+                        "title": "fileName"
+                    },
+                    "resultFilter": {
+                        "markdownDescription": "YAQL expression to filter result from NSP API",
+                        "type": "string",
+                        "title": "resultFilter"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.GroupCreation": {
+                "title": "nsp.GroupCreation",
+                "markdownDescription": "Provides a simplied async https action for Group Creation",
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "markdownDescription": "NSP API URL",
+                        "type": "string",
+                        "title": "url"
+                    },
+                    "method": {
+                        "markdownDescription": "Method type",
+                        "type": "string",
+                        "title": "method"
+                    },
+                    "contentType": {
+                        "markdownDescription": "Request body data type.  The valid values are application/json and application/xml.",
+                        "type": "string",
+                        "title": "contentType"
+                    },
+                    "accept": {
+                        "markdownDescription": "Response data type",
+                        "type": "string",
+                        "title": "accept"
+                    },
+                    "body": {
+                        "markdownDescription": "The request body.  This must be consistent with the contentType.  By default it is assumed to be consistent with application/json.",
+                        "type": "string",
+                        "title": "body"
+                    },
+                    "resultFilter": {
+                        "markdownDescription": "YAQL expression to filter result from NSP API",
+                        "type": "string",
+                        "title": "resultFilter"
+                    },
+                    "jsonPathSuccess": {
+                        "markdownDescription": "JSON PATH expression to match kafka event for completion",
+                        "type": "string",
+                        "title": "jsonPathSuccess"
+                    },
+                    "jsonPathError": {
+                        "markdownDescription": "JSON PATH expression to match kafka event for errors",
+                        "type": "string",
+                        "title": "jsonPathError"
+                    },
+                    "kafkTopic": {
+                        "markdownDescription": "Topic subscription for async event matching",
+                        "type": "string",
+                        "title": "kafkTopic"
+                    },
+                    "eventType": {
+                        "markdownDescription": "Event type JSON or CREATE UPDATE DELETE for Avro",
+                        "type": "string",
+                        "title": "eventType"
+                    },
+                    "timeout": {
+                        "markdownDescription": "Timeout in seconds waiting for matching event",
+                        "type": "string",
+                        "title": "timeout"
+                    },
+                    "cert": {
+                        "markdownDescription": "Certificate path  (full path required)",
+                        "type": "string",
+                        "title": "cert"
+                    },
+                    "auth": {
+                        "markdownDescription": "authorization Bearer override",
+                        "type": "string",
+                        "title": "auth"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.https": {
+                "title": "nsp.https",
+                "markdownDescription": "Provides a simplied https action for nsp",
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "markdownDescription": "NSP API URL",
+                        "type": "string",
+                        "title": "url"
+                    },
+                    "method": {
+                        "markdownDescription": "Method type, one of [GET, POST. PUT, PATCH, DELETE]",
+                        "type": "string",
+                        "title": "method"
+                    },
+                    "contentType": {
+                        "markdownDescription": "Request body data type.  The valid values are application/json and application/xml.",
+                        "type": "string",
+                        "title": "contentType"
+                    },
+                    "accept": {
+                        "markdownDescription": "Response type (application/json, text/plain), can be filtered and stored",
+                        "type": "string",
+                        "title": "accept"
+                    },
+                    "body": {
+                        "markdownDescription": "Request body.  The format must match the contentType field.  By default it is interpreted as consistent with application/json.",
+                        "title": "body"
+                    },
+                    "fileName": {
+                        "markdownDescription": "Save result to file (full path required)",
+                        "type": "string",
+                        "title": "fileName"
+                    },
+                    "resultFilter": {
+                        "markdownDescription": "YAQL expression to filter result from NSP API",
+                        "type": "string",
+                        "title": "resultFilter"
+                    },
+                    "cert": {
+                        "markdownDescription": "Certificate path  (full path required)",
+                        "type": "string",
+                        "title": "cert"
+                    },
+                    "auth": {
+                        "markdownDescription": "authorization Bearer override",
+                        "type": "string",
+                        "title": "auth"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.https_async": {
+                "title": "nsp.https_async",
+                "markdownDescription": "Provides a simplied async https action for nsp",
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "markdownDescription": "NSP API URL",
+                        "type": "string",
+                        "title": "url"
+                    },
+                    "method": {
+                        "markdownDescription": "Method type, one of [GET, POST. PUT, PATCH, DELETE]",
+                        "type": "string",
+                        "title": "method"
+                    },
+                    "contentType": {
+                        "markdownDescription": "Request body data type.  The valid values are application/json and application/xml.",
+                        "type": "string",
+                        "title": "contentType"
+                    },
+                    "accept": {
+                        "markdownDescription": "Response data type",
+                        "type": "string",
+                        "title": "accept"
+                    },
+                    "body": {
+                        "markdownDescription": "The request body.  This must match the contentType field.  By default it is assumed to be consistent with application/json.",
+                        "type": "string",
+                        "title": "body"
+                    },
+                    "resultFilter": {
+                        "markdownDescription": "YAQL expression to filter result from NSP API",
+                        "type": "string",
+                        "title": "resultFilter"
+                    },
+                    "jsonPathSuccess": {
+                        "markdownDescription": "JSON PATH expression to match kafka event for completion",
+                        "type": "string",
+                        "title": "jsonPathSuccess"
+                    },
+                    "jsonPathError": {
+                        "markdownDescription": "JSON PATH expression to match kafka event for errors",
+                        "type": "string",
+                        "title": "jsonPathError"
+                    },
+                    "kafkTopic": {
+                        "markdownDescription": "Topic subscription for async event matching",
+                        "type": "string",
+                        "title": "kafkTopic"
+                    },
+                    "eventType": {
+                        "markdownDescription": "Event type JSON or CREATE UPDATE DELETE for Avro",
+                        "type": "string",
+                        "title": "eventType"
+                    },
+                    "timeout": {
+                        "markdownDescription": "Timeout in seconds waiting for matching event",
+                        "type": "string",
+                        "title": "timeout"
+                    },
+                    "cert": {
+                        "markdownDescription": "Certificate path  (full path required)",
+                        "type": "string",
+                        "title": "cert"
+                    },
+                    "auth": {
+                        "markdownDescription": "authorization Bearer override",
+                        "type": "string",
+                        "title": "auth"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.jinja_template": {
+                "title": "nsp.jinja_template",
+                "markdownDescription": "Gets and Resolves a Jinja Template",
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "markdownDescription": "Name of the jinja template stored in WFM.",
+                        "type": "string",
+                        "title": "name"
+                    },
+                    "data": {
+                        "markdownDescription": "Data to resolve jinja template (If no data is passed, unresolved template is returned)",
+                        "title": "data"
+                    },
+                    "authorization": {
+                        "markdownDescription": "The authorization token.",
+                        "type": "string",
+                        "title": "authorization"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.JobCreation": {
+                "title": "nsp.JobCreation",
+                "markdownDescription": "Provides a simplied async https action for Job Creation",
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "markdownDescription": "NSP API URL",
+                        "type": "string",
+                        "title": "url"
+                    },
+                    "method": {
+                        "markdownDescription": "Method type",
+                        "type": "string",
+                        "title": "method"
+                    },
+                    "contentType": {
+                        "markdownDescription": "Request body data type. The valid values are application/json and application/xml.",
+                        "type": "string",
+                        "title": "contentType"
+                    },
+                    "accept": {
+                        "markdownDescription": "Response data type.",
+                        "type": "string",
+                        "title": "accept"
+                    },
+                    "body": {
+                        "markdownDescription": "The request body.  This must be consistent with the contentType.  By default it is assumed to be consistent with application/json.",
+                        "type": "string",
+                        "title": "body"
+                    },
+                    "resultFilter": {
+                        "markdownDescription": "YAQL expression to filter result from NSP API",
+                        "type": "string",
+                        "title": "resultFilter"
+                    },
+                    "jsonPathSuccess": {
+                        "markdownDescription": "JSON PATH expression to match kafka event for completion",
+                        "type": "string",
+                        "title": "jsonPathSuccess"
+                    },
+                    "jsonPathError": {
+                        "markdownDescription": "JSON PATH expression to match kafka event for errors",
+                        "type": "string",
+                        "title": "jsonPathError"
+                    },
+                    "kafkTopic": {
+                        "markdownDescription": "Topic subscription for async event matching",
+                        "type": "string",
+                        "title": "kafkTopic"
+                    },
+                    "eventType": {
+                        "markdownDescription": "Event type JSON or CREATE UPDATE DELETE for Avro",
+                        "type": "string",
+                        "title": "eventType"
+                    },
+                    "timeout": {
+                        "markdownDescription": "Timeout in seconds waiting for matching event",
+                        "type": "string",
+                        "title": "timeout"
+                    },
+                    "cert": {
+                        "markdownDescription": "Certificate path  (full path required)",
+                        "type": "string",
+                        "title": "cert"
+                    },
+                    "auth": {
+                        "markdownDescription": "authorization Bearer override",
+                        "type": "string",
+                        "title": "auth"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.kafka_producer": {
+                "title": "nsp.kafka_producer",
+                "markdownDescription": "Starts a kafka producer on NSP broker and sends message to the provided topic.",
+                "type": "object",
+                "properties": {
+                    "topic": {
+                        "markdownDescription": "The Kafka Topic (must exist)",
+                        "type": "string",
+                        "title": "topic"
+                    },
+                    "key": {
+                        "markdownDescription": "A string",
+                        "type": "string",
+                        "title": "key"
+                    },
+                    "msgFormat": {
+                        "markdownDescription": "Valid values are string or json.",
+                        "type": "string",
+                        "title": "msgFormat"
+                    },
+                    "msgs": {
+                        "markdownDescription": "Messages to send down to kafka",
+                        "title": "msgs"
+                    },
+                    "authorization": {
+                        "markdownDescription": "Bearer Token",
+                        "type": "string",
+                        "title": "authorization"
+                    },
+                    "secure": {
+                        "markdownDescription": "Defaults to True(set to False if kafka is enabled in unsecure mode)",
+                        "type": ["boolean", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "secure"
+                    },
+                    "onError": {
+                        "markdownDescription": "continue or stop. ",
+                        "type": "string",
+                        "title": "onError"
+                    },
+                    "results": {
+                        "markdownDescription": "This returns a list of messages that have been filed to be delivered.  The valid values are error and success.",
+                        "type": "string",
+                        "title": "results"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.mdm_cli": {
+                "title": "nsp.mdm_cli",
+                "markdownDescription": "Runs CLI commands on a single host managed by MDM",
+                "type": "object",
+                "properties": {
+                    "neId": {
+                        "markdownDescription": "The network element system ip (Ipv4 or Ipv6)",
+                        "type": "string",
+                        "title": "neId"
+                    },
+                    "cmds": {
+                        "markdownDescription": "The command(s) list to be executed in order",
+                        "title": "cmds"
+                    },
+                    "sessionId": {
+                        "markdownDescription": "reuse or new",
+                        "type": "string",
+                        "title": "sessionId"
+                    },
+                    "stopOn": {
+                        "markdownDescription": "The regex of what to stop on",
+                        "type": "string",
+                        "title": "stopOn"
+                    },
+                    "interactions": {
+                        "markdownDescription": "The list of interactions to be executed",
+                        "title": "interactions"
+                    },
+                    "idleTimeOut": {
+                        "markdownDescription": "Integer value to define the idleTimeOut. Min is 120 seconds",
+                        "type": ["number", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "idleTimeOut"
+                    },
+                    "maxResponseLimit": {
+                        "markdownDescription": "The max size a response should have in KB. Default is 10000KB",
+                        "type": ["number", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "maxResponseLimit"
+                    },
+                    "closeSession": {
+                        "markdownDescription": "True or False",
+                        "type": ["boolean", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "closeSession"
+                    },
+                    "queryParams": {
+                        "markdownDescription": "The query commands",
+                        "title": "queryParams"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.netconf": {
+                "title": "nsp.netconf",
+                "markdownDescription": "Executes NETCONF RPC commands",
+                "type": "object",
+                "properties": {
+                    "host": {
+                        "markdownDescription": "hostname or IP address",
+                        "type": "string",
+                        "title": "host"
+                    },
+                    "neId": {
+                        "markdownDescription": "System IP of MDM managed device.  Either provide neId or host, port, username &amp; password",
+                        "type": "string",
+                        "title": "neId"
+                    },
+                    "username": {
+                        "markdownDescription": "used for NETCONF authentication",
+                        "type": "string",
+                        "title": "username"
+                    },
+                    "password": {
+                        "markdownDescription": "used for NETCONF authentication",
+                        "type": "string",
+                        "title": "password"
+                    },
+                    "xml": {
+                        "markdownDescription": "xml payload",
+                        "type": "string",
+                        "title": "xml"
+                    },
+                    "xmlResponse": {
+                        "markdownDescription": "True or False",
+                        "type": ["boolean", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "xmlResponse"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.ping": {
+                "title": "nsp.ping",
+                "markdownDescription": "checks nodal reachability using ping",
+                "type": "object",
+                "properties": {
+                    "host": {
+                        "markdownDescription": "hostname or IP address",
+                        "type": "string",
+                        "title": "host"
+                    },
+                    "duration": {
+                        "markdownDescription": "test duration in seconds",
+                        "type": ["number", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "duration"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.python": {
+                "title": "nsp.python",
+                "markdownDescription": "Runs python code",
+                "type": "object",
+                "properties": {
+                    "script": {
+                        "markdownDescription": "Python code",
+                        "type": "string",
+                        "title": "script"
+                    },
+                    "context": {
+                        "markdownDescription": "Context here refers to a workflow published vars or any object passed.",
+                        "type": "string",
+                        "title": "context"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.shell": {
+                "title": "nsp.shell",
+                "markdownDescription": "executes a shell-level command",
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "markdownDescription": "command to execute",
+                        "type": "string",
+                        "title": "command"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.sr_cli": {
+                "title": "nsp.sr_cli",
+                "markdownDescription": "(WILL BE DEPRECATED, USE nsp.sr_cli_v2) Runs Secure Shell (SSH) command(s) on provided single or multiple hosts (SRs)",
+                "type": "object",
+                "properties": {
+                    "cmd": {
+                        "markdownDescription": "command",
+                        "title": "cmd"
+                    },
+                    "host": {
+                        "markdownDescription": "hostname or IP address",
+                        "type": "string",
+                        "title": "host"
+                    },
+                    "username": {
+                        "markdownDescription": "used for authentication",
+                        "type": "string",
+                        "title": "username"
+                    },
+                    "password": {
+                        "markdownDescription": "used for authentication",
+                        "type": "string",
+                        "title": "password"
+                    },
+                    "private_key_filename": {
+                        "markdownDescription": "path to key file",
+                        "type": "string",
+                        "title": "private_key_filename"
+                    },
+                    "timeout": {
+                        "markdownDescription": "cmd response timeout",
+                        "type": ["number", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "timeout"
+                    },
+                    "prompt": {
+                        "markdownDescription": "cli prompt, if not set prompt is auto determined",
+                        "type": "string",
+                        "title": "prompt"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.sr_cli_v2": {
+                "title": "nsp.sr_cli_v2",
+                "markdownDescription": "Runs Secure Shell (SSH) command(s) on SR",
+                "type": "object",
+                "properties": {
+                    "cmds": {
+                        "markdownDescription": "commands to execute on device",
+                        "title": "cmds"
+                    },
+                    "host": {
+                        "markdownDescription": "hostname or IP address",
+                        "type": "string",
+                        "title": "host"
+                    },
+                    "username": {
+                        "markdownDescription": "used for authentication",
+                        "type": "string",
+                        "title": "username"
+                    },
+                    "password": {
+                        "markdownDescription": "used for authentication",
+                        "type": "string",
+                        "title": "password"
+                    },
+                    "private_key_filename": {
+                        "markdownDescription": "path to key file for authentication",
+                        "type": "string",
+                        "title": "private_key_filename"
+                    },
+                    "timeout": {
+                        "markdownDescription": "cmd response timeout",
+                        "type": ["number", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "timeout"
+                    },
+                    "prompt": {
+                        "markdownDescription": "cli prompt, regex. Default is &quot;auto&quot; computes a regex prompt (e.g. NodeSR1# --&gt; NodeSR1.*#)",
+                        "type": "string",
+                        "title": "prompt"
+                    },
+                    "stopOn": {
+                        "markdownDescription": "regex on command output",
+                        "type": "string",
+                        "title": "stopOn"
+                    },
+                    "resultFilter": {
+                        "markdownDescription": "YAQL expression to filter all cmd output",
+                        "type": "string",
+                        "title": "resultFilter"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.textFSM": {
+                "title": "nsp.textFSM",
+                "markdownDescription": "applies textFSM template to CLI and shell responses",
+                "type": "object",
+                "properties": {
+                    "template": {
+                        "markdownDescription": "textFSM template",
+                        "type": "string",
+                        "title": "template"
+                    },
+                    "response": {
+                        "markdownDescription": "Response to be parsed",
+                        "type": "string",
+                        "title": "response"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.uploadFile": {
+                "title": "nsp.uploadFile",
+                "markdownDescription": "Uploads file to File Service app",
+                "type": "object",
+                "properties": {
+                    "fileServicePath": {
+                        "markdownDescription": "Directory path in File Service app",
+                        "type": "string",
+                        "title": "fileServicePath"
+                    },
+                    "localFilePath": {
+                        "markdownDescription": "Full path of file to be uploaded. Single file path | List of file paths",
+                        "title": "localFilePath"
+                    },
+                    "overwrite": {
+                        "markdownDescription": "Overwrite flag, true|false",
+                        "type": "string",
+                        "title": "overwrite"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.user_input": {
+                "title": "nsp.user_input",
+                "markdownDescription": "Provides an interface for user prompts and input",
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "markdownDescription": "Dialog title for user input/prompt",
+                        "type": "string",
+                        "title": "title"
+                    },
+                    "message": {
+                        "markdownDescription": "Detailed explanation about the user input/prompt",
+                        "type": "string",
+                        "title": "message"
+                    },
+                    "successAction": {
+                        "markdownDescription": "Provide the name for Success Operation, this will be translated to Dialogue button",
+                        "type": "string",
+                        "title": "successAction"
+                    },
+                    "errorAction": {
+                        "markdownDescription": "Provide the name for Error Operation, this will be translated to Dialogue button",
+                        "type": "string",
+                        "title": "errorAction"
+                    },
+                    "html": {
+                        "markdownDescription": "Display HTML content in the user input/prompt",
+                        "type": "string",
+                        "title": "html"
+                    },
+                    "inputForm": {
+                        "markdownDescription": "Schema based form to pass user input values.  It takes a Dictionary or a Dictionary that has been stringified.",
+                        "title": "inputForm"
+                    },
+                    "approvalGroups": {
+                        "markdownDescription": "User group to provide inputs, primarily used for approvals. ",
+                        "title": "approvalGroups"
+                    },
+                    "user": {
+                        "markdownDescription": "Target user for GUI pop up prompts, Defaults to workflow executing user.",
+                        "type": "string",
+                        "title": "user"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nspWebUI.intentList": {
+                "title": "nspWebUI.intentList",
+                "markdownDescription": "Queries the list of intents from NSP Intent Manager",
+                "type": "object",
+                "properties": {
+                    "token_auth": {
+                        "markdownDescription": "To comply with schema-form and provide user context",
+                        "type": "string",
+                        "title": "token_auth"
+                    },
+                    "formValues": {
+                        "markdownDescription": "prefilter intents by intentType",
+                        "title": "formValues"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nspWebUI.intentTypeList": {
+                "title": "nspWebUI.intentTypeList",
+                "markdownDescription": "Queries the list of intent-types from NSP Intent Manager",
+                "type": "object",
+                "properties": {
+                    "token_auth": {
+                        "markdownDescription": "To comply with schema-form and provide user context",
+                        "type": "string",
+                        "title": "token_auth"
+                    },
+                    "formValues": {
+                        "markdownDescription": "not used, but needed to comply with schema-form",
+                        "title": "formValues"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nspWebUI.intentTypeListWithDetails": {
+                "title": "nspWebUI.intentTypeListWithDetails",
+                "markdownDescription": "Queries the list of intent-types from NSP Intent Manager",
+                "type": "object",
+                "properties": {
+                    "token_auth": {
+                        "markdownDescription": "To comply with schema-form and provide user context",
+                        "type": "string",
+                        "title": "token_auth"
+                    },
+                    "formValues": {
+                        "markdownDescription": "not used, but needed to comply with schema-form",
+                        "title": "formValues"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nspWebUI.neList": {
+                "title": "nspWebUI.neList",
+                "markdownDescription": "Queries the list of NSP managed devices",
+                "type": "object",
+                "properties": {
+                    "token_auth": {
+                        "markdownDescription": "To comply with schema-form and provide user context",
+                        "type": "string",
+                        "title": "token_auth"
+                    },
+                    "formValues": {
+                        "markdownDescription": "not used, but needed to comply with schema-form",
+                        "title": "formValues"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nspWebUI.neListPaged": {
+                "title": "nspWebUI.neListPaged",
+                "markdownDescription": "Provides the list of managed devices with pagination/filtering support",
+                "type": "object",
+                "properties": {
+                    "token_auth": {
+                        "markdownDescription": "To comply with schema-form and provide user context",
+                        "type": "string",
+                        "title": "token_auth"
+                    },
+                    "formValues": {
+                        "markdownDescription": "used for pagination and filtering",
+                        "title": "formValues"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nspWebUI.portList": {
+                "title": "nspWebUI.portList",
+                "markdownDescription": "Queries the list of NSP managed ports",
+                "type": "object",
+                "properties": {
+                    "token_auth": {
+                        "markdownDescription": "To comply with schema-form and provide user context",
+                        "type": "string",
+                        "title": "token_auth"
+                    },
+                    "formValues": {
+                        "markdownDescription": "provide to prefilter ports",
+                        "title": "formValues"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nspWebUI.portListPaged": {
+                "title": "nspWebUI.portListPaged",
+                "markdownDescription": "Provides the list of physical ports with pagination/filtering support",
+                "type": "object",
+                "properties": {
+                    "token_auth": {
+                        "markdownDescription": "To comply with schema-form and provide user context",
+                        "type": "string",
+                        "title": "token_auth"
+                    },
+                    "formValues": {
+                        "markdownDescription": "used for pagination and filtering",
+                        "title": "formValues"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nspWebUI.portNElist": {
+                "title": "nspWebUI.portNElist",
+                "markdownDescription": "Queries the list of NSP managed devices",
+                "type": "object",
+                "properties": {
+                    "token_auth": {
+                        "markdownDescription": "To comply with schema-form and provide user context",
+                        "type": "string",
+                        "title": "token_auth"
+                    },
+                    "formValues": {
+                        "markdownDescription": "not used, but needed to comply with schema-form",
+                        "title": "formValues"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nspWebUI.wfList": {
+                "title": "nspWebUI.wfList",
+                "markdownDescription": "Queries the list of available workflows",
+                "type": "object",
+                "properties": {
+                    "token_auth": {
+                        "markdownDescription": "To comply with schema-form and provide user context",
+                        "type": "string",
+                        "title": "token_auth"
+                    },
+                    "formValues": {
+                        "markdownDescription": "not used, but needed to comply with schema-form",
+                        "title": "formValues"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "nsp.yaql_eval": {
+                "title": "nsp.yaql_eval",
+                "markdownDescription": "Provides an evaluator to check YAQL expressions",
+                "type": "object",
+                "properties": {
+                    "context": {
+                        "markdownDescription": "The YAML/JSON to be evaluated",
+                        "type": "string",
+                        "title": "context"
+                    },
+                    "expression": {
+                        "markdownDescription": "The YAQL expression that is to be used on the context",
+                        "type": "string",
+                        "title": "expression"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "std.async_noop": {
+                "title": "std.async_noop",
+                "markdownDescription": "Asynchronous no-operation action",
+                "type": "object",
+                "properties": {
+                },
+                "additionalProperties": false
+            },
+            "std.echo": {
+                "title": "std.echo",
+                "markdownDescription": "Echo action",
+                "type": "object",
+                "properties": {
+                    "output": {
+                        "markdownDescription": "Output of echo",
+                        "title": "output"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "std.email": {
+                "title": "std.email",
+                "markdownDescription": "Send Email",
+                "type": "object",
+                "properties": {
+                    "from_addr": {
+                        "markdownDescription": "Sender&#39;s Address",
+                        "type": "string",
+                        "title": "from_addr"
+                    },
+                    "to_addrs": {
+                        "markdownDescription": "Recipient&#39;s Address",
+                        "title": "to_addrs"
+                    },
+                    "smtp_server": {
+                        "markdownDescription": "SMTP Server",
+                        "type": "string",
+                        "title": "smtp_server"
+                    },
+                    "cc_addrs": {
+                        "markdownDescription": "CC recipient",
+                        "type": "string",
+                        "title": "cc_addrs"
+                    },
+                    "bcc_addrs": {
+                        "markdownDescription": "BCC recipient",
+                        "type": "string",
+                        "title": "bcc_addrs"
+                    },
+                    "smtp_password": {
+                        "markdownDescription": "SMTP Password",
+                        "type": "string",
+                        "title": "smtp_password"
+                    },
+                    "subject": {
+                        "markdownDescription": "Email Subject",
+                        "type": "string",
+                        "title": "subject"
+                    },
+                    "body": {
+                        "markdownDescription": "Email Body",
+                        "type": "string",
+                        "title": "body"
+                    },
+                    "html_body": {
+                        "markdownDescription": "Email HTML Body",
+                        "type": "string",
+                        "title": "html_body"
+                    },
+                    "attachments": {
+                        "markdownDescription": "List of file paths under /tmp",
+                        "title": "attachments"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "std.fail": {
+                "title": "std.fail",
+                "markdownDescription": "Always fail action",
+                "type": "object",
+                "properties": {
+                    "error_data": {
+                        "markdownDescription": "Action will be failed with this data",
+                        "title": "error_data"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "std.http": {
+                "title": "std.http",
+                "markdownDescription": "HTTP action",
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "markdownDescription": "URL for the new HTTP request",
+                        "type": "string",
+                        "title": "url"
+                    },
+                    "method": {
+                        "markdownDescription": "(optional, &#39;GET&#39; by default) method for the new HTTP request",
+                        "type": "string",
+                        "title": "method"
+                    },
+                    "params": {
+                        "markdownDescription": "(optional) Dictionary or bytes to be sent in the query string for the HTTP request",
+                        "type": "string",
+                        "title": "params"
+                    },
+                    "headers": {
+                        "markdownDescription": "(optional) Dictionary of HTTP Headers to send with the HTTP request",
+                        "title": "headers"
+                    },
+                    "cookies": {
+                        "markdownDescription": "(optional) Dict or CookieJar object to send with the HTTP request",
+                        "type": "string",
+                        "title": "cookies"
+                    },
+                    "auth": {
+                        "markdownDescription": "(optional) Auth tuple to enable Basic/Digest/Custom HTTP Auth",
+                        "type": "string",
+                        "title": "auth"
+                    },
+                    "allow_redirects": {
+                        "markdownDescription": "(optional) Boolean. Set to True if POST/PUT/DELETE redirect following is allowed",
+                        "type": "string",
+                        "title": "allow_redirects"
+                    },
+                    "proxies": {
+                        "markdownDescription": "(optional) Dictionary mapping protocol to the URL of the proxy",
+                        "type": "string",
+                        "title": "proxies"
+                    },
+                    "verify": {
+                        "markdownDescription": "(optional) if ``True``, the SSL cert will be verified",
+                        "title": "verify"
+                    },
+                    "clientCert": {
+                        "markdownDescription": "(optional) if ``True``, the client cert will be presented",
+                        "type": "string",
+                        "title": "clientCert"
+                    },
+                    "clientCertKey": {
+                        "markdownDescription": "(optional) if ``True``, the client cert key will be presented",
+                        "type": "string",
+                        "title": "clientCertKey"
+                    },
+                    "body": {
+                        "title": "body"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "std.javascript": {
+                "title": "std.javascript",
+                "markdownDescription": "Evaluates given JavaScript",
+                "type": "object",
+                "properties": {
+                    "script": {
+                        "markdownDescription": "javascript script",
+                        "type": "string",
+                        "title": "script"
+                    },
+                    "context": {
+                        "markdownDescription": "Context here refers to a javascript context not the usual mistral context. That is passed during the run method.",
+                        "type": "string",
+                        "title": "context"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "std.js": {
+                "title": "std.js",
+                "markdownDescription": "Evaluates given JavaScript",
+                "type": "object",
+                "properties": {
+                    "script": {
+                        "markdownDescription": "javascript script",
+                        "type": "string",
+                        "title": "script"
+                    },
+                    "context": {
+                        "markdownDescription": "Context here refers to a javascript context not the usual mistral context. That is passed during the run method.",
+                        "type": "string",
+                        "title": "context"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "std.mistral_http": {
+                "title": "std.mistral_http",
+                "markdownDescription": "HTTP action",
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "markdownDescription": "URL for the new HTTP request",
+                        "type": "string",
+                        "title": "url"
+                    },
+                    "method": {
+                        "markdownDescription": "(optional, &#39;GET&#39; by default) method for the new HTTP request",
+                        "type": "string",
+                        "title": "method"
+                    },
+                    "params": {
+                        "markdownDescription": "(optional) Dictionary or bytes to be sent in the query string for the HTTP request",
+                        "type": "string",
+                        "title": "params"
+                    },
+                    "headers": {
+                        "markdownDescription": "(optional) Dictionary of HTTP Headers to send with the HTTP request",
+                        "type": "string",
+                        "title": "headers"
+                    },
+                    "cookies": {
+                        "markdownDescription": "(optional) Dict or CookieJar object to send with the HTTP request",
+                        "type": "string",
+                        "title": "cookies"
+                    },
+                    "auth": {
+                        "markdownDescription": "(optional) Auth tuple to enable Basic/Digest/Custom HTTP Auth",
+                        "type": "string",
+                        "title": "auth"
+                    },
+                    "allow_redirects": {
+                        "markdownDescription": "(optional) Boolean. Set to True if POST/PUT/DELETE redirect following is allowed",
+                        "type": "string",
+                        "title": "allow_redirects"
+                    },
+                    "proxies": {
+                        "markdownDescription": "(optional) Dictionary mapping protocol to the URL of the proxy",
+                        "type": "string",
+                        "title": "proxies"
+                    },
+                    "verify": {
+                        "markdownDescription": "(optional) if ``True``, the SSL cert will be verified",
+                        "type": "string",
+                        "title": "verify"
+                    },
+                    "clientCert": {
+                        "markdownDescription": "(optional) if ``True``, the client cert will be presented",
+                        "type": "string",
+                        "title": "clientCert"
+                    },
+                    "clientCertKey": {
+                        "markdownDescription": "(optional) if ``True``, the client cert key will be presented",
+                        "type": "string",
+                        "title": "clientCertKey"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "std.noop": {
+                "title": "std.noop",
+                "markdownDescription": "No-operation action",
+                "type": "object",
+                "properties": {
+                },
+                "additionalProperties": false
+            },
+            "std.sleep": {
+                "title": "std.sleep",
+                "markdownDescription": "Sleep action",
+                "type": "object",
+                "properties": {
+                    "seconds": {
+                        "markdownDescription": "number of seconds to sleep",
+                        "type": ["number", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "seconds"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "std.ssh": {
+                "title": "std.ssh",
+                "markdownDescription": "Runs Secure Shell (SSH) command on provided single or multiple hosts",
+                "type": "object",
+                "properties": {
+                    "cmd": {
+                        "markdownDescription": "command",
+                        "title": "cmd"
+                    },
+                    "host": {
+                        "markdownDescription": "hostname or IP address",
+                        "type": "string",
+                        "title": "host"
+                    },
+                    "username": {
+                        "markdownDescription": "used for authentication",
+                        "type": "string",
+                        "title": "username"
+                    },
+                    "password": {
+                        "markdownDescription": "used for authentication",
+                        "type": "string",
+                        "title": "password"
+                    },
+                    "private_key_filename": {
+                        "markdownDescription": "path to key file",
+                        "type": "string",
+                        "title": "private_key_filename"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "std.ssh_proxied": {
+                "title": "std.ssh_proxied",
+                "markdownDescription": "SSH Proxied",
+                "type": "object",
+                "properties": {
+                    "cmd": {
+                        "markdownDescription": "command",
+                        "title": "cmd"
+                    },
+                    "host": {
+                        "markdownDescription": "hostname or IP address",
+                        "type": "string",
+                        "title": "host"
+                    },
+                    "username": {
+                        "markdownDescription": "used for authentication",
+                        "type": "string",
+                        "title": "username"
+                    },
+                    "private_key_filename": {
+                        "markdownDescription": "path to key file",
+                        "type": "string",
+                        "title": "private_key_filename"
+                    },
+                    "gateway_host": {
+                        "markdownDescription": "gateway host",
+                        "type": "string",
+                        "title": "gateway_host"
+                    },
+                    "gateway_username": {
+                        "markdownDescription": "gateway username",
+                        "type": "string",
+                        "title": "gateway_username"
+                    },
+                    "password": {
+                        "markdownDescription": "used for authentication",
+                        "type": "string",
+                        "title": "password"
+                    },
+                    "proxy_command": {
+                        "markdownDescription": "proxy command",
+                        "type": "string",
+                        "title": "proxy_command"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "std.test_dict": {
+                "title": "std.test_dict",
+                "markdownDescription": "Generates test dict",
+                "type": "object",
+                "properties": {
+                    "size": {
+                        "markdownDescription": "The size of the dictionary.",
+                        "type": ["number", "string"],
+                        "pattern": "^<%.*%>$",
+                        "title": "size"
+                    },
+                    "key_prefix": {
+                        "markdownDescription": "The key_prefix for the values in the dictionary.",
+                        "type": "string",
+                        "title": "key_prefix"
+                    },
+                    "val": {
+                        "markdownDescription": "The value for the dictionary entry.",
+                        "type": "string",
+                        "title": "val"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "std.wait_ssh": {
+                "title": "std.wait_ssh",
+                "markdownDescription": "This action sshs to a host and then waits for 10 seconds",
+                "type": "object",
+                "properties": {
+                    "host": {
+                        "markdownDescription": "The host name to ssh to",
+                        "type": "string",
+                        "title": "host"
+                    },
+                    "username": {
+                        "markdownDescription": "The user name for the ssh command",
+                        "type": "string",
+                        "title": "username"
+                    },
+                    "password": {
+                        "markdownDescription": "The password for the ssh command",
+                        "type": "string",
+                        "title": "password"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "test": {
+                "title": "test",
+                "markdownDescription": "No description provided",
+                "type": "object",
+                "properties": {
+                    "token_auth": {
+                        "title": "token_auth"
+                    },
+                    "formValues": {
+                        "title": "formValues"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "yang.compare": {
+                "title": "yang.compare",
+                "markdownDescription": "model-aware differ",
+                "type": "object",
+                "properties": {
+                    "before": {
+                        "markdownDescription": "baseline data instance (dict, xml string or json string)",
+                        "title": "before"
+                    },
+                    "after": {
+                        "markdownDescription": "data instance to compare against (dict, xml string or json string)",
+                        "title": "after"
+                    },
+                    "yangOptions": {
+                        "markdownDescription": "&#39;folder&#39;: directory to load YANG files from (string)",
+                        "title": "yangOptions"
+                    },
+                    "fmt": {
+                        "markdownDescription": "The requested output format.  Valid values are dict, json or xml.",
+                        "type": "string",
+                        "title": "fmt"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "yang.convert": {
+                "title": "yang.convert",
+                "markdownDescription": "model-aware converter",
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "markdownDescription": "data instance to convert (dict, xml string or json string)",
+                        "title": "data"
+                    },
+                    "yangOptions": {
+                        "markdownDescription": "&#39;folder&#39;: directory to load YANG files from (string)",
+                        "title": "yangOptions"
+                    },
+                    "fmt": {
+                        "markdownDescription": "The requested output format.  Valid values are dict, json, or xml.",
+                        "type": "string",
+                        "title": "fmt"
+                    }
+                },
+                "additionalProperties": false
+            }
+        }
+    },
+    "required": [
+        "version"
+    ],
+    "properties": {
+        "version": {
+            "type": "string",
+            "markdownDescription": "Mistral DSL version number",
+            "enum": ["2.0"]
+        }
+    },
+    "patternProperties": {
+        "^(?!(version)).*$": {
+            "$ref": "#/definitions/workflow"
+        }
+    },
+    "maxProperties": 2,
+    "minProperties": 2,
+    "type": "object"
+}
