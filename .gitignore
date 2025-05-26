@@ -6,4 +6,5 @@ out
 /schema/snippets.json
 /schema/wfm-schema.json
 *.vsix
+*.DS_Store
 dist/

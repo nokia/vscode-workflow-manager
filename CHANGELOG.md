@@ -88,6 +88,13 @@ Updates:
         - file: workflow name.json (workflow view)
         - file: workflow name.yaml  (workflow definition)
         - file: README.md (workflow documentation)
+
+# [3.1.0]
+
+**Updates:**
+* Additional error control check added to align with NSP SDK.
+* Cross-launch to NSP before 23.11 is now deprecated. All links work now with 23.11 onwards.
+
 ____
 
 <p align="center">
