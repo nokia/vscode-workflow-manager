@@ -6,3 +6,4 @@
 
 export { WorkflowManagerProvider} from './WorkflowManagerProvider';
 export { CodelensProvider } from './CodelensProvider';
+export { WorkflowTreeProvider } from './WorkflowTreeProvider';
