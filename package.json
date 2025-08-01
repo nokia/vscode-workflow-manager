@@ -3,7 +3,7 @@
   "displayName": "NOKIA_WFM",
   "description": "NOKIA WFM VsCode Developer Plugin",
   "version": "3.1.0",
-  "icon": "media/Nokia_WFM.png",
+  "icon": "resources/icons/nsp.png",
   "publisher": "Nokia",
   "engines": {
     "vscode": "^1.76.0"
@@ -27,8 +27,8 @@
       "activitybar": [
         {
           "id": "workflowManager",
-          "title": "Workflow Manager",
-          "icon": "media/Nokia_WFM.png"
+          "title": "NSP - Workflow",
+          "icon": "resources/icons/nsp.svg"
         }
       ]
     },
