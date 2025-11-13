@@ -167,6 +167,7 @@ code --install-extension <path-to-vsix-file>
 * By changing the extension config, the data does not get updated. User needs to reload vsCode to get config updated.
 * Local files are always treated as workflows. We need a mechanism to differentiate workflows from actions in local folders.
 * In-line validation only works for workflows, not for actions (requires JSON schema for actions).
+* Workflow design (UI) in Beta mode.
 
 <br>
 

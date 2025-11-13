@@ -26,6 +26,8 @@ export function activate(context: vscode.ExtensionContext) {
 	const localpath : string = config.get("localStorage.folder") ?? "";
 	const fileIgnore : Array<string> = config.get("ignoreTags") ?? [];
 	const bestPracticesDiagnostics = vscode.languages.createDiagnosticCollection('[WFM]: bestPractices: ' + "https://network.developer.nokia.com/learn/24_4/network-programmability-automation-frameworks/workflow-manager-framework/wfm-workflow-development/wfm-best-practices/");
+	let enabled : boolean = config.get("enabled") ?? true;
+	const statusbar_enabled = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 90);
 
 	const wfmProvider = new WorkflowManagerProvider(server, username, secretStorage, port, localsave, localpath, timeout, fileIgnore);
 	
@@ -82,12 +84,48 @@ export function activate(context: vscode.ExtensionContext) {
 		wfmProvider.yaqalator();
 	}));
 
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.openEditor', async () => {
+		wfmProvider.openEditor(null);
+	}));
+
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.openWFEditor', async (resource: vscode.Uri) => {
+		wfmProvider.openEditor(resource);
+	}));
+
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.runBestPractices', async () => {
 		wfmProvider.runBestPractices(bestPracticesDiagnostics);
 	}));
 
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.clearProblems', async (resource: vscode.Uri) => {
 		wfmProvider.clearProblems(bestPracticesDiagnostics, resource);
+	}));
+
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.updateEnvironment', async (resource: vscode.Uri) => {
+		wfmProvider.updateEnvironment();
+	}));
+
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.deactivate', async () => {
+		console.log("Workspace Folders");
+		console.log(vscode.workspace.workspaceFolders);
+		let wfmfolder = vscode.workspace.workspaceFolders.find(({ index, name }) => name === "Workflow Manager");
+		console.log(wfmfolder.index);
+		config.update("enabled",false);
+		vscode.workspace.updateWorkspaceFolders(wfmfolder.index, 1);
+
+		statusbar_enabled.command = 'nokia-wfm.reactivate';
+		statusbar_enabled.tooltip = 'Deactivated (click to activate)';
+		statusbar_enabled.text = '$(sync-ignored) WFM';
+	}));
+
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.reactivate', async () => {
+		config.update("enabled",true);
+		statusbar_enabled.command = 'nokia-wfm.deactivate';
+		statusbar_enabled.tooltip = 'Active (click to stop)';
+		statusbar_enabled.text = '$(sync) WFM';
+		vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders.length : 0, null, { uri: vscode.Uri.parse('wfm:/'), name: "Workflow Manager" });
+		if (vscode.workspace.workspaceFolders.find(({ index, name }) => name === "Workflow Manager").index === 0) {
+			vscode.window.showInformationMessage("Workflow Manager folder added at root. Disable WFM file server by using the button in the status bar if you need a local root folder instead.");
+		}
 	}));
 
 	// // Generate schema for validation
@@ -157,6 +195,25 @@ export function activate(context: vscode.ExtensionContext) {
 		config.update("NSPIP", nspAddr, vscode.ConfigurationTarget.Workspace);
 	});
 
+	function updateStatusBarItem() {
+		const editor = vscode.window.activeTextEditor;
+		const sbar = wfmProvider.getStatusBarItem();
+
+		if (editor) {
+			const document = editor.document;
+			const parts = document.uri.toString().split('/').map(decodeURIComponent);
+
+			if (parts[0]==="wfm:") {
+				sbar.text = "$(type-hierarchy) "+wfmProvider.getExecutionEnvironment();
+				sbar.command = 'nokia-wfm.updateEnvironment';
+				sbar.show();
+			} else sbar.hide();
+		} else sbar.hide();
+	}
+
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.updateStatusBar', async () => updateStatusBarItem()));
+	context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(updateStatusBarItem));
+	context.subscriptions.push(wfmProvider.getStatusBarItem());
 	
 	// checks if the workspace folder is nsp-workflow and hides the examples button
 	vscode.workspace.onDidChangeWorkspaceFolders(async () => {
@@ -174,5 +231,21 @@ export function activate(context: vscode.ExtensionContext) {
 	}
 
 	// Add Workflow Manager folder to workspace
-	vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders.length : 0, null, { uri: vscode.Uri.parse('wfm:/'), name: "Workflow Manager" });
+	if (enabled) {
+
+		vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders.length : 0, null, { uri: vscode.Uri.parse('wfm:/'), name: "Workflow Manager" });
+		
+		if (vscode.workspace.workspaceFolders.find(({ index, name }) => name === "Workflow Manager").index === 0) {
+			vscode.window.showInformationMessage("Workflow Manager folder added at root. Disable WFM file server by using the button in the status bar if you need a local root folder instead.");
+		}
+
+		statusbar_enabled.command = 'nokia-wfm.deactivate';
+		statusbar_enabled.tooltip = 'Active (click to stop)';
+		statusbar_enabled.text = '⏵ WFM';
+	} else {
+		statusbar_enabled.command = 'nokia-wfm.reactivate';
+		statusbar_enabled.tooltip = 'Deactivated (click to activate)';
+		statusbar_enabled.text = '⏸ WFM';
+	}
+	statusbar_enabled.show();
 }

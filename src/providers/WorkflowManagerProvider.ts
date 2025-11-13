@@ -19,6 +19,9 @@ const DECORATION_UNSIGNED: vscode.FileDecoration =    new vscode.FileDecoration(
 	'', 'Workflow: Unsigned', new vscode.ThemeColor('list.highlightForeground')
 );
 
+const myStatusBarItem: vscode.StatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+myStatusBarItem.command = 'nokia-nokia-wfm.updateEnv';
+
 export class FileStat implements vscode.FileStat { // FileStat is a class that contains the file status
 
 	id: string;
@@ -69,6 +72,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	workflow_views: {[name: string]: FileStat}; // DS for workflow_views
 	workflow_folders: {[name: string]: FileStat}; // DS for workflow_folders
 	pluginLogs: vscode.LogOutputChannel;
+	wfmactions: {};
+	env: string;
 	
 	public onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[] | undefined>;
     private _eventEmiter: vscode.EventEmitter<vscode.Uri | vscode.Uri[]>;
@@ -95,6 +100,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.secretStorage = secretStorage;
 		this.nspVersion = undefined;
 		this.osdVersion = undefined;
+		this.wfmactions = {};
 		
 		// caching actions/workflows/templates for better performance - updated whenever calling readDirectory()
 		this.actions = {};
@@ -103,6 +109,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.workflow_documentations = {};
 		this.workflow_views = {};
 		this.workflow_folders = {};
+		this.env = "DefaultEnv"; // default environment
 
 		// Instantiate the pluginLogs output channel
 		this.pluginLogs = vscode.window.createOutputChannel('WFM Plugin Logs', {log: true});
@@ -1002,7 +1009,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * Method to validate a workflow by calling the NSP and checking if the workflow is valid
 	 * @param {string} data - data to be validated by NSP
 	 */
-	private async _validateWorkflow(data: string): Promise<void> {
+	private async _validateWorkflow(data: string): Promise<Boolean> {
 		this.pluginLogs.info('[WFM]: _validateWorkflow()');
 
 		// validate workflow definition
@@ -1019,6 +1026,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (!response.ok) {
 			this.checkResponseStatus(response);
 			vscode.window.showErrorMessage('Workflow validation failed!');
+			return false;
 		} else {
 			let json = await response.json();
 			if (json.response.data.valid === 'false') {
@@ -1030,8 +1038,10 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					  vscode.window.showInformationMessage(json.response.data.error, { modal: true });
 					}
 				  });
+				return false;
 			} else {
 				vscode.window.showInformationMessage('Success: Workflow validated');
+				return true;
 			}
 		}
 	}
@@ -1655,7 +1665,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 						workflow_id: id,
 						workflow_name: wfnm,
 						description: "workflow execution from vsCode",
-						input: attribjs
+						input: attribjs,
+						params: { "env" : this.env }
 					}
 				)
 			});
@@ -1788,6 +1799,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	async generateSchema(): Promise<void> {
 		this.pluginLogs.info('[WFM]: generateSchema()');
 		let data;
+		this.pluginLogs.info("Just checking");
 		await this._getAuthToken(); // get auth-token
 		const token = await this.authToken;
 		if (!token) {
@@ -1800,6 +1812,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		let templatePath = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema-builder.json.j2').toString().replace("file://","");
 		let outpath = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema.json').toString().replace("file://","");
 		let snippetsfile = vscode.Uri.joinPath(extURI, 'schema', 'snippets.json').toString().replace("file://","");
+		let ntwTemplate = vscode.Uri.joinPath(extURI, 'src', 'html', 'network.html.j2').toString().replace("file://","");
+		let ntwOutput = vscode.Uri.joinPath(extURI, 'src', 'html', 'network.html').toString().replace("file://","");
 		let snippets:JSON={} as JSON;
 		let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/action";
 		const wfm_response: any = await this._callNSP(url,{method: 'GET',
@@ -1823,14 +1837,17 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const YAML = require('yaml');
 		const ny = require('nunjucks');
 		let actionlist = []; // used to store a list of actions
+		let ntwActions: any = {};
 		actions.forEach(function(action) {
 			let entry: any = {};
 			try {
 				let ym = YAML.parse(action.description);
+				ntwActions[action.name] = action.input.split(", "); // store the action in the ntwActions object
 				entry["name"]=action.name;
 				if (Object.keys(ym).includes("examples")){ // if the action has examples
 					const ex1 = Object.keys(ym.examples)[0];
 					snippets[ym.action]={"scope":"yaml","prefix":ym.action,"description":ex1,"body":[ym.examples[ex1]]};
+					this.wfmactions[ym.action] = ym.examples[ex1]; // add the action to the actions list
 				}
 				entry["description"] = ym.short_description.replace("\n", " ").trim(); // parse for the workflow description
 				entry["properties"] = ym.input; // parse for the workflow properties
@@ -1894,6 +1911,19 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				this.pluginLogs.error(err);
 			}
 		});
+
+		ny.configure({ autoescape: false });
+		var ntwRender = ny.render(ntwTemplate, {"input": JSON.stringify(ntwActions)});
+		//ntwRender = ntwRender.replaceAll("&quot;",'"');
+		fs.writeFile(ntwOutput, ntwRender, (err) => { 
+			if(err) { 
+				this.pluginLogs.error(err);
+			}
+		});
+
+		this.pluginLogs.info("Snippets: \n"+JSON.stringify(snippets, null, '\t'));
+		this.wfmactions = snippets; // set the wfmactions to the snippets
+		this.pluginLogs.info("WFMActions: \n"+JSON.stringify(this.wfmactions, null, '\t'));
 
 		fs.writeFile(snippetsfile, JSON.stringify(snippets,null,'\t'), (err) => { 
 			if(err) { 
@@ -2332,6 +2362,381 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				vscode.window.showErrorMessage('Select a valid yaql expression surrounded by <% and %>');
 			}
 		}
+	}
+
+	/**
+	 * Method to open the workflow designer editor
+	 * @param {vscode.Uri} uri - The URI of the workflow file to open
+	*/
+
+	async openEditor(resource: vscode.Uri): Promise<void> {
+		this.pluginLogs.info('[WFM]: openEditor()');
+
+		vscode.window.showWarningMessage("Beta functionality! It has functional gaps, particularly when updating existing definitions.");
+
+		let wfname = ""
+		let YAML = require("yaml");
+		let payload = {"nodes": [], "edges": [], "output": "", "outputonerror": ""};
+		
+		if (!resource) {
+			wfname = await vscode.window.showInputBox({
+				placeHolder: "Enter the workflow name",
+				prompt: "Enter the workflow name to open in the editor",
+				value: "myworkflow"
+			});
+		} else {
+			wfname = resource.path.split('/').pop().split('.')[0];
+			let existingDefinition = await this.readFile(resource);
+			let wfyaml = YAML.parse(existingDefinition.toString());
+			
+			if (wfyaml[wfname] && wfyaml[wfname].tasks) {
+				if (wfyaml[wfname].input) {
+					payload.nodes.push({id: "input", label: "Input", wfinputs: YAML.stringify(wfyaml[wfname].input)});
+				}
+				if (wfyaml[wfname].output) {
+					payload.output = YAML.stringify(wfyaml[wfname].output);
+				}
+				if (wfyaml[wfname]["output-on-error"]) {
+					payload.outputonerror = YAML.stringify(wfyaml[wfname]["output-on-error"]);
+				}
+				Object.keys(wfyaml[wfname].tasks).forEach((task) => {
+					let taskDef = wfyaml[wfname].tasks[task];
+					let node = {
+						id: task,
+						label: task,
+						action: taskDef.action || "nsp.https",
+						extra: "",
+						attribs: taskDef.input || {},
+						shape: "dot", size: 15,
+					};
+					// Handle input attributes that are objects
+					Object.keys(node.attribs).forEach((att) => {
+						if (typeof node.attribs[att] == "object") {
+							node.attribs[att] = YAML.stringify(node.attribs[att]);
+						}
+					});
+
+					let extraValues = Object.assign({}, taskDef);
+
+					// Handle other attributes besides input and transitions
+					delete extraValues.action;
+					delete extraValues.input;
+					delete extraValues["on-complete"];
+					delete extraValues["on-success"];
+					delete extraValues["on-error"];
+					node.extra = YAML.stringify(extraValues);
+					payload.nodes.push(node);
+					if (taskDef["on-success"]) {
+						this.pluginLogs.info(typeof taskDef["on-success"]);
+						if (Array.isArray(taskDef["on-success"])){
+							taskDef["on-success"].forEach((successTask) => {
+								this.pluginLogs.info(typeof successTask);
+								if (typeof successTask === "string") {
+									payload.edges.push({from: task, to: successTask, arrows: "to", dashes: true, color: "#0eb200", condition: "on-success" });
+								} else {
+									payload.edges.push({from: task, to: Object.keys(successTask)[0], arrows: "to", dashes: true, color: "#0eb200", condition: "on-success" });
+								}
+							});
+						} else {
+							let successTask = taskDef["on-success"];
+							if (typeof successTask === "string") {
+								payload.edges.push({from: task, to: successTask, arrows: "to", dashes: true, color: "#0eb200", condition: "on-success" });
+							} else {
+								payload.edges.push({from: task, to: Object.keys(successTask)[0], arrows: "to", dashes: true, color: "#0eb200", condition: "on-success" });
+							}
+						}
+					}
+					if (taskDef["on-error"]) {
+						this.pluginLogs.info(typeof taskDef["on-error"]);
+						if (Array.isArray(taskDef["on-error"])){
+							taskDef["on-error"].forEach((failureTask) => {
+								this.pluginLogs.info(typeof failureTask);
+								if (typeof failureTask === "string") {
+									payload.edges.push({from: task, to: failureTask, arrows: "to", dashes: true,  color: "#d5402e", condition: "on-error" });
+								} else {
+									payload.edges.push({from: task, to: Object.keys(failureTask)[0], arrows: "to", dashes: true,  color: "#d5402e", condition: "on-error" });
+								}						
+							});
+						} else {
+							let failureTask = taskDef["on-error"]
+							if (typeof failureTask === "string") {
+								payload.edges.push({from: task, to: failureTask, arrows: "to", dashes: true,  color: "#d5402e", condition: "on-error" });
+							} else {
+								payload.edges.push({from: task, to: Object.keys(failureTask)[0], arrows: "to", dashes: true,  color: "#d5402e", condition: "on-error" });
+							}	
+						}
+					}
+					if (taskDef["on-complete"]) {
+						this.pluginLogs.info(typeof taskDef["on-complete"]);
+						if (Array.isArray(taskDef["on-complete"])){
+							taskDef["on-complete"].forEach((completionTask) => {
+								this.pluginLogs.info(typeof completionTask);
+								if (typeof completionTask === "string") {
+									payload.edges.push({from: task, to: completionTask, arrows: "to", dashes: true, condition: "on-complete" });
+								} else {
+									payload.edges.push({from: task, to: Object.keys(completionTask)[0], arrows: "to", dashes: true, condition: "on-complete" });
+								}
+							});
+						} else {
+							let completionTask = taskDef["on-complete"];
+							this.pluginLogs.info(typeof completionTask);
+							if (typeof completionTask === "string") {
+								payload.edges.push({from: task, to: completionTask, arrows: "to", dashes: true, condition: "on-complete" });
+							} else {
+								payload.edges.push({from: task, to: Object.keys(completionTask)[0], arrows: "to", dashes: true, condition: "on-complete" });
+							}
+						}
+					}
+				});
+				// Connect input to the first task
+				payload.edges.push({from: "input", to: Object.keys(wfyaml[wfname].tasks)[0], dashes: true });
+				
+				
+			} else {
+				vscode.window.showErrorMessage("No valid workflow definition found in the file.");
+				return;
+			}
+			// Continue here
+		}
+		const panel = vscode.window.createWebviewPanel(
+						'Workflow Design: '+ wfname,
+						'Workflow Design: '+ wfname,
+						vscode.ViewColumn.Two,
+						{
+							enableScripts: true,
+							localResourceRoots: [vscode.Uri.joinPath(this.extContext.extensionUri, 'media')]
+						}
+					);
+		let fs = require("fs");
+		let path = require("path");
+		
+		const filePath = path.join(this.extContext.extensionUri.fsPath, 'src', 'html', 'network.html');
+    	const FinalTable = fs.readFileSync(filePath, 'utf8');
+		panel.webview.html = FinalTable;
+
+		if(resource) {
+			await new Promise(f => setTimeout(f, 1000));
+			panel.webview.postMessage({ command: 'loadWorkflow', payload: payload, wfname: wfname });
+		}
+
+		// Generating the schema (getting the action lists and snippets) if not available
+		if (Object.keys(this.wfmactions).length === 0) {
+			this.generateSchema();
+		}
+
+		panel.webview.onDidReceiveMessage(
+			async (message) => {
+				console.log('Received message from webview:', message.network);      
+				vscode.window.showInformationMessage("Generating workflow: "+ wfname);
+
+				let network = JSON.parse(message.network);
+				let first = "";
+				let tasks = [];
+				let iterable = [];
+
+				// Finding the first task
+				for (const edge of network.edges) {
+					if (edge.from.localeCompare("input") == 0){
+						first = edge.to;
+						iterable.push(edge.to);
+						console.log('First task:' + first);
+						break;
+					} else if (edge.to.localeCompare("input") == 0) {
+						first = edge.from;
+						iterable.push(edge.from);
+						console.log('First task:' + first);
+						break;
+					}
+				}
+
+				// Getting tasks in the correct order
+				console.log('Iterating');
+				let i = 0;
+				while (iterable.length > 0) {
+					i+=1;
+					let next = iterable.shift();
+					for (const edge of network.edges) {
+						if (edge.from.localeCompare(next) == 0){
+							if ((tasks.includes(edge.to) == false && iterable.includes(edge.to) == false) && edge.to.localeCompare("input") != 0) {
+								iterable.push(edge.to);
+							}
+						} else if (edge.to.localeCompare(next) == 0) {
+							if ((tasks.includes(edge.from) == false && iterable.includes(edge.from) == false) && edge.from.localeCompare("input") != 0) {
+								iterable.push(edge.from);
+							}
+						}
+					}
+					console.log(i);
+					tasks.push(next);
+					if (i > 100) {
+						vscode.window.showErrorMessage("Too many tasks, please check your logic!");
+						return;
+					}
+				}
+				console.log("A");
+
+				let tasknames = [];
+				let tasknodes = [];
+				console.log("Tasks: " + tasks);
+				tasks.forEach((task) => {
+					let node = network.nodes.find(n => n.id === task);
+					if (node) {
+						tasknames.push(node.label);
+						tasknodes.push(node);
+					}
+				});
+
+				// Creating base workflow definition
+				let wfdef:any;
+				if (!resource){
+					wfdef = YAML.parse("---\nversion: '2.0'\n\n"+wfname+":\n  type: direct\n\n  description: generated using Workflow Designer\n");
+				} else {
+					let existingDefinition = await this.readFile(resource);
+					wfdef = YAML.parse(existingDefinition.toString());
+				}
+				let input = network.nodes.find(n => n.id === "input");
+				if ((input.wfinputs) && input.wfinputs.length > 0) {
+					try{
+						wfdef[wfname].input = YAML.parse(input.wfinputs);
+					} catch (e) {
+						vscode.window.showErrorMessage("Invalid YAML input ");
+						return;
+					}
+				}
+
+				// Adding output and outputonerror if found
+				if (network.output.length != 0){
+					wfdef[wfname]["output"] = YAML.parse(network.output)
+				}
+				if (network.outputonerror.length != 0){
+					wfdef[wfname]["output-on-error"] = YAML.parse(network.outputonerror)
+				}
+
+				if (Object.keys(wfdef[wfname]).indexOf("tasks") === -1){
+					wfdef[wfname].tasks = {};
+				}
+
+				console.log("Task names: " + tasknames);
+				console.log(JSON.stringify(tasknodes));
+
+				// Adding tasks: adding each task using the snippets and updating based on inputs
+				console.log("let's iterate")
+				tasknodes.forEach((ne) => {
+					// TODO: Review the second condition with inventory2telemetry, as it is not working!!!!
+					if ((Object.keys(this.wfmactions).indexOf(ne.action) === -1) && (Object.keys(wfdef[wfname].tasks).indexOf(ne.label) === -1)) {
+						vscode.window.showErrorMessage("No available example for " + ne.action + ". Please, remove this action and add manually once generated: "+ ne.label);
+						this.pluginLogs.info(ne.label);
+						this.pluginLogs.info(wfdef[wfname].tasks);
+						this.pluginLogs.info((Object.keys(wfdef[wfname].tasks).indexOf(ne.label) === -1).toString());
+						this.pluginLogs.info((Object.keys(this.wfmactions).indexOf(ne.action) === -1).toString())
+						this.pluginLogs.info(Object.keys(this.wfmactions).toString());
+						return;
+					}
+					let snip:any;
+					this.pluginLogs.info(ne.label);
+					this.pluginLogs.info((Object.keys(wfdef[wfname].tasks).indexOf(ne.label) === -1).toString());
+					if ((!resource)||(Object.keys(wfdef[wfname].tasks).indexOf(ne.label) === -1)){
+						snip = YAML.parse(this.wfmactions[ne.action].body[0]);
+						this.pluginLogs.info(snip);
+						let key = Object.keys(snip)[0];
+						this.pluginLogs.info(key);
+						wfdef[wfname].tasks[ne.label] = snip[key];
+						this.pluginLogs.info(snip[key]);
+					} /*else {
+						snip = wfdef[wfname].tasks[ne.label];
+						wfdef[wfname].tasks[ne.label] = snip;
+					}*/
+
+					let extra = YAML.parse(ne.extra);
+					if (extra!= null && extra != undefined){
+						for (const [k, v] of Object.entries(extra)) {
+							wfdef[wfname].tasks[ne.label][k] = v;
+						}
+					}
+					
+					let attribs = Object.keys(ne.attribs);
+					if (attribs.length > 0) {
+						this.pluginLogs.info(ne.label)
+						this.pluginLogs.info(wfdef[wfname].tasks[ne.label])
+						wfdef[wfname].tasks[ne.label].input = {};
+						attribs.forEach((attrib) => {
+							console.log("attrib: " + attrib);
+							try {
+								wfdef[wfname].tasks[ne.label].input[attrib] = YAML.parse(ne.attribs[attrib]);
+							} catch {
+								wfdef[wfname].tasks[ne.label].input[attrib] = ne.attribs[attrib];
+							}
+						});
+					}
+					
+					//Removing any existing on-complete/on-success/on-error statements
+					if (Object.keys(wfdef[wfname].tasks[ne.label]).indexOf("on-complete") !== -1) {
+						delete wfdef[wfname].tasks[ne.label]["on-complete"];
+					}
+					if (Object.keys(wfdef[wfname].tasks[ne.label]).indexOf("on-success") !== -1) {
+						delete wfdef[wfname].tasks[ne.label]["on-success"];
+					}
+					if (Object.keys(wfdef[wfname].tasks[ne.label]).indexOf("on-error") !== -1) {
+						delete wfdef[wfname].tasks[ne.label]["on-error"];
+					}
+				});
+
+				// Adding edges: on-complete/error/success statements
+				console.log("Adding edges");
+
+
+
+				for (const edge of network.edges) {
+
+					if ((edge.from.localeCompare("input") == 0) || (edge.to.localeCompare("input") == 0) || (network.nodes.find(n => n.id === edge.from) === undefined) || (network.nodes.find(n => n.id === edge.to) === undefined)) {
+						// skip edges that are connected to input or to non-existing nodes
+						continue; // skip edges that are connected to input	
+					}
+					let fromTask = network.nodes.find(n => n.id === edge.from).label;
+					let toTask = network.nodes.find(n => n.id === edge.to).label;
+					let condition = edge.condition ? edge.condition : "on-complete";
+					if (Object.keys(wfdef[wfname].tasks[fromTask]).indexOf(condition) === -1) {
+						wfdef[wfname].tasks[fromTask][condition] = [];
+					}
+					if (!Array.isArray(wfdef[wfname].tasks[fromTask][condition])) {
+						wfdef[wfname].tasks[fromTask][condition] = [];
+					}
+					if (!wfdef[wfname].tasks[fromTask][condition].includes(toTask)){
+						wfdef[wfname].tasks[fromTask][condition].push(toTask); // TODO: Error when processing string (on-complete, on-success, etc.), no list...
+					}
+					console.log("Adding " + toTask + " to " + fromTask + " " + condition);
+				}
+				console.log(YAML.stringify(wfdef));
+
+				for (const taskname in wfdef[wfname].tasks) {
+					if (tasknames.indexOf(taskname) === -1) {
+						this.pluginLogs.info("Deleting non existing task: "+taskname);
+						this.pluginLogs.info(JSON.stringify(Object.keys(wfdef[wfname].tasks)));
+						this.pluginLogs.info(JSON.stringify(tasks));
+						delete wfdef[wfname].tasks[taskname];
+					}
+				}
+
+				console.log(YAML.stringify(wfdef));
+
+				if (this._validateWorkflow(YAML.stringify(wfdef))) {
+					await this._writeWorkflow(wfname+".yaml", YAML.stringify(wfdef));
+					await vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer');
+					let txtdoc = await vscode.workspace.openTextDocument( vscode.Uri.parse("wfm:/workflows/"+ wfname + "/" + wfname+".yaml"));
+					if (vscode.workspace.textDocuments.includes(txtdoc)){
+						await vscode.window.showTextDocument(txtdoc,vscode.ViewColumn.One);
+						await vscode.commands.executeCommand('workbench.action.closeActiveEditor');	
+					}
+					vscode.window.showTextDocument(txtdoc,vscode.ViewColumn.One);
+
+				} else {
+					vscode.window.showErrorMessage("Workflow validation failed. Please, check the logs for more details.");
+				}
+				return;
+			},
+			null,
+			null
+			);
 	}
 
 	/**
@@ -2986,6 +3391,48 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	}
 
 	/**
+	 * Method to return the status bar
+	*/	
+	public getStatusBarItem(): vscode.StatusBarItem {
+		return myStatusBarItem;
+	}
+
+	/**
+	 * Method to return the status bar
+	*/	
+	public getExecutionEnvironment(): string {
+		return this.env;
+	}
+
+	/**
+	 * Method to update the execution environment
+	*/	
+	public async updateEnvironment(): Promise<void> {
+		let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/workflow-environment";
+		let response: any = await this._callNSP(url, { method: 'GET'}); // get workflow / action definition
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
+		if (!response.ok) {
+			this.checkResponseStatus(response);
+			throw vscode.FileSystemError.Unavailable('Cannot get workflow environments');
+		}
+		let json = await response.json();
+		let envs = [];
+		if (json?.response?.data) {
+			json.response.data.forEach((env: any) => {envs.push(env.name);});
+		}
+		await vscode.window.showQuickPick(envs).then( async selection => {
+			if (selection) {
+				this.env = selection;
+			}
+		});
+
+		await vscode.commands.executeCommand("nokia-wfm.updateStatusBar");
+			
+	}
+
+	/**
 	 * vsCode.FileSystemProvider method to create folders.
 	 * @param {vscode.Uri} uri URI of the folder to be created
 	*/	
@@ -3093,6 +3540,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.workflow_views = {};
 		this.actions = {};
 		this.templates = {};
+		this.generateSchema();
 		vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer');
 	}
 

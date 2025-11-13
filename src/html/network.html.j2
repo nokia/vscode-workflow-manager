@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+		<html lang="en">
+		<head>
+			<title>Network</title>
+			<!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src https://unpkg.com;">-->
+			<script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+			<style type="text/css">
+      body {
+        background-color: #1A212D;
+      }
+
+			#mynetwork {
+        background-color: #252E38;
+				width: 100%;
+				height: 600px;
+        border: 2px solid #d8e6ff;
+        border-radius: 12px;
+        margin-top: 20px;
+        margin-bottom: 20px;
+			}
+      * {box-sizing: border-box;}
+
+/* Button used to open the contact form - fixed at the bottom of the page */
+.open-button {
+  background-color: #555;
+  color: white;
+  padding: 16px 20px;
+  border: none;
+  cursor: pointer;
+  opacity: 0.8;
+  position: fixed;
+  bottom: 23px;
+  right: 28px;
+  width: 280px;
+}
+
+/* The popup form - hidden by default */
+.form-popup {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  right: 15px;
+  border: 3px solid #f1f1f1;
+  z-index: 9;
+}
+
+/* Add styles to the form container */
+.form-container {
+  max-width: 300px;
+  padding: 10px;
+  background-color: white;
+}
+
+/* Full-width input fields */
+.form-container input[type=text], .form-container input[type=password] {
+  width: 100%;
+  padding: 15px;
+  margin: 5px 0 22px 0;
+  border: none;
+  background: #f1f1f1;
+}
+
+.switch {
+  position: absolute;
+  right: 15px;
+  top: 25px;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+.switch input { 
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #0059ff;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #0059ff;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(26px);
+  -ms-transform: translateX(26px);
+  transform: translateX(26px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+.button {
+  background-color: #04AA6D; /* Green */
+  width: calc(17% - 4px);
+  margin-left: 2.5%;
+  border: none;
+  border-radius: 12px;
+  color: white;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  transition-duration: 0.4s;
+  cursor: pointer;
+}
+
+.buttonGreyed {
+  background-color: #999999; 
+  color: white; 
+  border: 2px solid black;
+}
+
+.button2 {
+  background-color: white; 
+  color: #015AFF; 
+  border: 2px solid #015AFF;
+}
+
+.button2:hover {
+  background-color: #015AFF;
+  color: white;
+}
+
+.button3 {
+  background-color: white; 
+  color: #00b737; 
+  border: 2px solid #00b737;
+}
+
+.button3:hover {
+  background-color: #00b737;
+  color: white;
+}
+
+.button1 {
+  background-color: white; 
+  color: #d5402e; 
+  border: 2px solid #d5402e;
+}
+
+.button1:hover {
+  background-color: #d5402e;
+  color: white;
+}
+
+/* The Modal (background) */
+.modal {
+  display: none; /* Hidden by default */
+  position: fixed; /* Stay in place */
+  z-index: 1; /* Sit on top */
+  left: 0;
+  top: 0;
+  width: 100%; /* Full width */
+  height: 100%; /* Full height */
+  overflow: auto; /* Enable scroll if needed */
+  background-color: rgb(0,0,0); /* Fallback color */
+  background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+  -webkit-animation-name: fadeIn; /* Fade in the background */
+  -webkit-animation-duration: 0.4s;
+  animation-name: fadeIn;
+  animation-duration: 0.4s
+}
+
+/* Modal Content */
+.modal-content {
+  position: fixed;
+  bottom: 0;
+  background-color: #fefefe;
+  width: 100%;
+  -webkit-animation-name: slideIn;
+  -webkit-animation-duration: 0.4s;
+  animation-name: slideIn;
+  animation-duration: 0.4s;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* The Close Button */
+.close {
+  color: white;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+  color: #000;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.modal-header {
+  padding: 2px 16px;
+  background-color: #1A212D;
+  color: white;
+  border-bottom: #ccc solid 1px;
+}
+
+.modal-body {
+  padding: 2px 16px;
+  padding-top: 15px;
+  height: 160px;
+  background-color: #252E38;
+  color: white;
+}
+
+.modal-footer {
+  padding: 2px 16px;
+  background-color: #1A212D;
+  color: white;
+}
+
+label{
+  color: white;
+  font-size: 16px;
+  margin-left: 10px;
+}
+
+/* Add Animation */
+@-webkit-keyframes slideIn {
+  from {bottom: -300px; opacity: 0} 
+  to {bottom: 0; opacity: 1}
+}
+
+@keyframes slideIn {
+  from {bottom: -300px; opacity: 0}
+  to {bottom: 0; opacity: 1}
+}
+
+@-webkit-keyframes fadeIn {
+  from {opacity: 0} 
+  to {opacity: 1}
+}
+
+@keyframes fadeIn {
+  from {opacity: 0} 
+  to {opacity: 1}
+}
+
+input[type=text], select, textarea {
+  width: 30%;
+  padding: 6px 10px;
+  margin: 8px 0;
+  display: inline-block;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.btn {
+  width: 30%;
+  background-color: #0056a3;
+  color: white;
+  padding: 6px 10px;
+  margin: 8px 0;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background-color: #005AFF;
+}
+
+
+			</style>
+		</head>
+		<body>
+      <img src="https://www.nokia.com/themes/custom/onenokia_reskin/logo-white.svg" height="40" style="margin-top: 20px;"/>
+      <label class="switch">
+      <input type="checkbox" id="hierarchyCheck" onclick="hierarchy()" checked>
+        <span class="slider round"></span>
+      </label>
+			<div id="mynetwork"></div>
+      <div id="myModal" class="modal">
+        <!-- Modal content -->
+        <div class="modal-content">
+          <div class="modal-header">
+            <span class="close" onclick="closeForm()">&times;</span>
+            <h2>Add edge</h2>
+          </div>
+          <div class="modal-body">
+          <select id="condition" name="condition">
+            <option value="on-complete">on-complete</option>
+            <option value="on-success">on-success</option>
+            <option value="on-error">on-error</option>
+          </select><label for="condition">Condition</label><br>
+          <input type="text" placeholder="" name="econdition" id="econdition">
+          <label for="econdition">Extra conditions</label><br>
+          <button type="button" class="btn" onclick="addEdge()">Send</button>
+        </div>
+          <div class="modal-footer">
+            <h3>vsCode - Workflow Manager</h3>
+          </div>
+        </div>
+      </div>
+      <div id="myModalTask" class="modal">
+        <!-- Modal content -->
+        <div class="modal-content">
+          <div class="modal-header">
+            <span class="close" onclick="closeTaskForm()">&times;</span>
+            <h2>Add new task</h2>
+          </div>
+          <div class="modal-body">
+          <input type="text" placeholder="" name="taskname" id="taskname" required><label for="taskname">Task name</label><br>
+          <select id="actionname" name="actionname"></select>
+          <label for="actionname">Action</label><br>
+          <button type="button" class="btn" onclick="addNode()">Send</button>
+
+        </div>
+          <div class="modal-footer">
+            <h3>vsCode - Workflow Manager</h3>
+          </div>
+        </div>
+      </div>
+      <div id="myModalEditTask" class="modal">
+        <!-- Modal content -->
+        <div class="modal-content">
+          <div class="modal-header">
+            <span class="close" onclick="closeEditTaskForm()">&times;</span>
+            <h2 id="editHead"></h2>
+          </div>
+          <div class="modal-body" id="editBody">
+          </div>
+          <div class="modal-footer">
+            <h3>vsCode - Workflow Manager</h3>
+          </div>
+        </div>
+      </div>
+      <div id="myModalEditOutput" class="modal">
+        <!-- Modal content -->
+        <div class="modal-content">
+          <div class="modal-header">
+            <span class="close" onclick="closeEditOutput()">&times;</span>
+            <h2>Edit workflow output (YAML)</h2>
+          </div>
+          <div class="modal-body" style="height: 320px;" id="editOutput">
+          <textarea name="output" cols="40" rows="7" placeholder="Output (YAML)" id="output" style="margin: 2px 0;"></textarea><label for="output">Output</label><br>
+          <textarea name="outputonerror" cols="40" rows="7" placeholder="Output-on-error (YAML)" id="outputonerror" style="margin: 2px 0;"></textarea><label for="output">Output-on-error</label><br>
+          <button type="button" class="btn" onclick="saveOutput()">Send</button>
+          </div>
+          <div class="modal-footer">
+            <h3>vsCode - Workflow Manager</h3>
+          </div>
+        </div>
+      </div>
+      <button class="button button2" title="Add task" onclick="openTaskForm()"><b>&#10753;</b></button>
+      <button class="button buttonGreyed" title="Remove task"  id="deleteTask" onclick="deleteTask()"><b>&#10754;</b></button>
+      <button class="button buttonGreyed" title="Remove link" id="deleteEdge" onclick="deleteEdge()"><b>&#8655;</b></button>
+      <button class="button button2" title="Workflow Output" id="outputButton" onclick="openTaskFormOutput()"><b>&#8960;</b></button>
+      <button class="button button3" title="Generate" onclick="generate()"><b>&#8682;</b></button>
+
+
+			<script type="text/javascript">
+			// create an array with nodes
+
+      /*
+        TODO:
+        - backend to save the workflow
+        - with-items support
+        - output
+      */
+
+      hideDeleteTask();
+      hideDeleteEdge();
+
+			var nodes = new vis.DataSet([
+				{ id: "input", label: "Input", wfinputs: "",shape: "dot", size: 15 ,font: { color: "#279B56" }, color: { background: "#279B56", highlight: "#27DE56" } },
+			]);
+
+      var edges = new vis.DataSet();     
+
+      const vscode = acquireVsCodeApi();
+
+      var output = "";
+      var outputonerror = "";
+
+      const actionInputs = {{ input }};
+
+      var selectActions = "";
+      for (const key of Object.keys(actionInputs)) {
+        if (key.localeCompare("nsp.https") == 0){
+          selectActions += '<option value="' + key + '" selected="selected">' + key + '</option>';
+        } else {
+          selectActions += '<option value="' + key + '">' + key + '</option>';
+        }
+      }
+      document.getElementById("actionname").innerHTML = selectActions;
+
+      var selectedNode = "";
+      var selectedAux = "";
+      var selectedAuxAux = "";
+      var selectedEdge = "";
+
+      var modal = document.getElementById("myModal");
+      var modalTask = document.getElementById("myModalTask");
+      var myModalEditTask = document.getElementById("myModalEditTask");
+
+      var connectedInput = "";
+      
+			// create a network
+			var container = document.getElementById("mynetwork");
+			var data = {
+				nodes: nodes,
+				edges: edges,
+			};
+			// var options = {};
+			const options = {
+				manipulation: false,
+				height: "100%",
+        nodes: {
+          font: {
+            size: 18,
+            color: "#ffffff"
+          },
+          color: {
+            background: "#002D7F"
+          }
+        },
+				layout: {
+					hierarchical: {
+					enabled: true,
+					levelSeparation: 100,
+					},
+				},
+				physics: {
+					hierarchicalRepulsion: {
+					nodeDistance: 100,
+					},
+				},
+				};
+
+      const previousState = vscode.getState();
+      if ((previousState !== undefined) && (previousState.nodes !== undefined) && (previousState.edges !== undefined)) {
+        console.log("Data is not empty, reloading previous state...");
+        console.log(previousState);
+        nodes = new vis.DataSet(previousState.nodes);
+        edges = new vis.DataSet(previousState.edges);
+
+        output = previousState.output || "";
+        outputonerror = previousState.outputonerror || "";
+        
+        data = {nodes: nodes, edges: edges};
+      }
+
+			var network = new vis.Network(container, data, options);
+
+      network.on("click", function (params) {
+        params.event = "[original event]";
+        if (params.nodes.length > 0) { // Clicking on Nodes
+          selectedAuxAux = selectedAux;
+          selectedAux = params.nodes[0];
+          hideDeleteEdge();
+          if (selectedAux.localeCompare("input") != 0){
+            showDeleteTask();
+          } else {
+            hideDeleteTask();
+          }
+          if (selectedNode.localeCompare(selectedAux) == 0){
+            selectedNode = selectedAux;
+            selectedAuxAux = selectedAux;
+            return;
+          }
+          if (selectedNode.localeCompare("") != 0) {
+            if (selectedNode.localeCompare("input") == 0 || selectedAux.localeCompare("input") == 0){
+              if (connectedInput.length == 0){
+                connectedInput = selectedNode+"/"+selectedAux;
+                connectedInput = connectedInput.replace("input/", "").replace("/input", "");
+                console.log(connectedInput);
+                edges.update({ from: selectedNode, to: selectedAux, dashes: true });
+                saveState();
+              }
+              selectedNode = "";
+              selectedAux = "";
+              selectedAuxAux = "";
+            } else {
+              openForm();
+            }
+          } else {
+            selectedNode = selectedAux;
+          }
+        } else if (params.edges.length == 1) { // Clicking on Edges
+          hideDeleteTask();
+          showDeleteEdge();
+          selectedEdge = params.edges[0];
+        } else { // Clicking on empty space
+          selectedNode = "";
+          selectedEdge = "";
+          modal.style.display = "none";
+          modalTask.style.display = "none";
+          hideDeleteTask();
+          hideDeleteEdge();
+        }
+        console.log(
+          "click event, getNodeAt returns: " +
+            this.getNodeAt(params.pointer.DOM)
+        );
+      });
+
+      function escapeHtml(string) {
+        return string
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      network.on("doubleClick", function (params) {
+        params.event = "[original event]";
+        console.log(params);
+        const longattributes = ["script","body","scriptFilter"];
+         if (params.nodes.length > 0) {
+          var nodeId = params.nodes[0];
+          var ne = nodes.get(nodeId);
+          var content = "";
+          var height = 60;
+          if (ne.label.localeCompare("Input") == 0){
+            document.getElementById("editHead").innerHTML = "Edit input attributes";
+          } else {
+            document.getElementById("editHead").innerHTML = "Edit task: " + ne.label +" (" + ne.action + ")";
+          }
+          console.log(ne);
+          if (ne.label.localeCompare("Input") == 0){
+            if (ne.wfinputs != null && ne.wfinputs.length != 0){
+              content += '<textarea name="inputs" cols="40" rows="10" placeholder="Input attributes in YAML" id="wfinputs" style="margin: 2px 0;">'+ne.wfinputs+'</textarea><label for="wfinputs">Workflow Inputs</label><br>';
+            } else {
+              content += '<textarea name="inputs" cols="40" rows="10" placeholder="Input attributes in YAML" id="wfinputs" style="margin: 2px 0;"></textarea><label for="wfinputs">Workflow Inputs</label><br>';
+            }
+            height += 180;
+          } else {
+            var attribs = actionInputs[ne.action];
+            height += (attribs.length * 35);
+             
+            console.log(ne.attribs);
+            for (var i = 0; i < attribs.length; i++){
+              var aux = attribs[i].split("=");
+              console.log(aux);
+              console.log(ne.attribs[aux[0]]);
+              if (aux.length == 2){
+                if (ne.attribs[aux[0]] != undefined && ne.attribs[aux[0]] != null && ne.attribs[aux[0]].length != 0){
+                  if (ne.attribs[aux[0]].toString().search("\n") != -1) {
+                    content += '<textarea name="select_'+aux[0]+'" cols="40" rows="4" placeholder="'+escapeHtml(aux[1])+'" id="select_'+aux[0]+'" style="margin: 2px 0;">'+ne.attribs[aux[0]].toString().replaceAll("'",'"')+'</textarea><label for="select_'+aux[0]+'">'+aux[0]+'</label><br>';
+                    height += 50;
+                  } else {
+                    content += '<input type="text" placeholder="'+escapeHtml(aux[1])+'" name="select_'+aux[0]+'" id="select_'+aux[0]+'" style="margin: 2px 0;"'+" value='"+ne.attribs[aux[0]].toString().replaceAll("'",'"')+"'>"+'<label for="select_'+aux[0]+'">'+aux[0]+'</label><br>';
+                  }
+                } else {
+                  if  (longattributes.includes(aux[0])) {
+                    content += '<textarea name="select_'+aux[0]+'" cols="40" rows="4" placeholder="" id="select_'+aux[0]+'" style="margin: 2px 0;"></textarea><label for="select_'+aux[0]+'">'+aux[0]+'</label><br>';
+                    height += 50;
+                  } else {
+                    content += '<input type="text" placeholder="'+escapeHtml(aux[1])+'" name="select_'+aux[0]+'" id="select_'+aux[0]+'" style="margin: 2px 0;"><label for="select_'+aux[0]+'">'+aux[0]+'</label><br>';
+                  }
+                }
+              } else {
+                if (ne.attribs[aux[0]] != undefined && ne.attribs[aux[0]] != null && ne.attribs[aux[0]].length != 0){
+                  if (ne.attribs[aux[0]].toString().search("\n") != -1) {
+                    content += '<textarea name="select_'+aux[0]+'" cols="40" rows="4" placeholder="" id="select_'+aux[0]+'" style="margin: 2px 0;">'+ne.attribs[aux[0]].toString().replaceAll("'",'"')+'</textarea><label for="select_'+aux[0]+'">'+aux[0]+'</label><br>';
+                    height += 50;
+                  } else {
+                    content += '<input type="text" placeholder="" name="select_'+aux[0]+'" id="select_'+aux[0]+'" style="margin: 2px 0;"'+" value='"+ne.attribs[aux[0]].toString().replaceAll("'",'"')+"'>"+'<label for="select_'+aux[0]+'">'+aux[0]+'</label><br>';
+                  }
+                } else {
+                  if  (longattributes.includes(aux[0])) {
+                    content += '<textarea name="select_'+aux[0]+'" cols="40" rows="4" placeholder="" id="select_'+aux[0]+'" style="margin: 2px 0;"></textarea><label for="select_'+aux[0]+'">'+aux[0]+'</label><br>';
+                    height += 50;
+                  } else {
+                    content += '<input type="text" placeholder="" name="select_'+aux[0]+'" id="select_'+aux[0]+'" style="margin: 2px 0;"><label for="select_'+aux[0]+'">'+aux[0]+'</label><br>';
+                  }
+                }
+              }
+            }
+            
+            // show additional task attributes
+            if (ne.extra != null && ne.extra.length != 0){
+              content += '<textarea name="extra" cols="40" rows="10" placeholder="Extra task attributes in YAML" id="extraAttribs" style="margin: 2px 0; position: absolute; right: 10px; top: 100px;">'+ne.extra+'</textarea><br><label for="econdition" style="position: absolute; right: 10px; top: 80px;">Extra attributes</label>';
+            } else {
+              content += '<textarea name="extra" cols="40" rows="10" placeholder="Extra task attributes in YAML" id="extraAttribs" style="margin: 2px 0; position: absolute; right: 10px; top: 100px;"></textarea><br><label for="econdition" style="position: absolute; right: 10px; top: 80px;">Extra attributes</label>';
+            }
+          }
+          if (content.length != 0){
+            content += '<button type="button" class="btn" onclick="updateNode()">Send</button>';
+          } 
+          
+          document.getElementById("editBody").innerHTML = content;
+          height = Math.max(height,250);
+          document.getElementById("editBody").style.height = height.toString() + "px";
+          myModalEditTask.style.display = "block";
+          selectedAux = nodeId;
+          selectedNode = nodeId;
+          selectedAuxAux = nodeId;
+          hideDeleteEdge();
+         }
+      });
+
+      function addEdge() {
+        if (selectedAuxAux.localeCompare(selectedNode) != 0){
+          selectedNode = selectedAuxAux;
+        }
+        var condition = document.getElementById("condition").value;
+        var extra = document.getElementById("econdition").value;
+        document.getElementById("econdition").value = "";
+        console.log(condition);
+        if (condition.localeCompare("on-success")==0){
+          edges.update({ from: selectedNode, to: selectedAux, arrows: "to", dashes: true, color: "#0eb200", condition: "on-success" });
+          console.log("I am here");  
+        } else if (condition.localeCompare("on-error")==0){
+          edges.update({ from: selectedNode, to: selectedAux, arrows: "to", dashes: true, color: "#d5402e", condition: "on-error" });
+          console.log("Not here");  
+        } else {
+          edges.update({ from: selectedNode, to: selectedAux, arrows: "to", dashes: true, condition: "on-complete" });
+        }
+        saveState();
+        closeForm();
+      }
+
+      function addNode() {
+        var taskname = document.getElementById("taskname").value;
+        var actionname = document.getElementById("actionname").value;
+        document.getElementById("taskname").value = "";
+        console.log(taskname);
+        console.log(actionname);
+        nodes.update({label: taskname, shape: "dot", size: 15, action: actionname, inputs: actionInputs[actionname], attribs: {}, updated: false, extra: ""});
+        network.redraw();
+        hierarchy();
+        closeTaskForm();
+        saveState();
+      }
+
+      function updateNode(){
+        var ne = nodes.get(selectedAux);
+        console.log(ne);
+        if (ne.label.localeCompare("Input") == 0){
+          var wfinputs = document.getElementById("wfinputs").value;
+          nodes.update({id: "input", wfinputs: wfinputs, updated: true});
+          closeEditTaskForm();
+          saveState();
+          return;
+        }
+        var inputs = ne.inputs;
+        var newInputs = {};
+        for (var i = 0; i < inputs.length; i++){
+          var aux = document.getElementById("select_"+inputs[i].split("=")[0]);
+          if ((aux != null) && (aux.value != null) && (aux.value.length != 0)){
+            newInputs[inputs[i].split("=")[0]] = aux.value;
+          } /* else {
+            newInputs[inputs[i].split("=")[0]] = "";
+          } */
+        }
+        var extra = document.getElementById("extraAttribs");
+        console.log(newInputs);
+        nodes.update({id: selectedAux, attribs: newInputs, updated: true, extra: extra.value});
+        //network.redraw();
+        //hierarchy();
+        closeEditTaskForm();
+        saveState();
+      }
+
+      function showDeleteTask() {
+         var el = document.getElementById("deleteTask");
+         el.classList.remove("buttonGreyed");
+         el.classList.add("button1");
+      }
+
+      function hideDeleteTask() {
+         var el = document.getElementById("deleteTask");
+         el.classList.remove("button1");
+         el.classList.add("buttonGreyed");
+      }
+
+      function showDeleteEdge() {
+        var el = document.getElementById("deleteEdge");
+         el.classList.remove("buttonGreyed");
+         el.classList.add("button1");
+      }
+
+      function hideDeleteEdge() {
+        var el = document.getElementById("deleteEdge");
+         el.classList.remove("button1");
+         el.classList.add("buttonGreyed");
+      }
+
+      function openForm() {
+        //document.getElementById("addedgeform").style.display = "block";
+        console.log(selectedNode);
+        console.log(selectedAux);
+        modal.style.display = "block";
+      }
+
+      function openTaskForm() {
+        modalTask.style.display = "block";
+      }
+
+      function closeTaskForm() {
+        console.log("close task form");
+        modalTask.style.display = "none";
+      }
+
+      function closeEditTaskForm() {
+        console.log("close task form");
+        myModalEditTask.style.display = "none";
+      }
+
+      function openTaskFormOutput() {
+        if (output.length == 0){
+          document.getElementById("output").value = "";
+        } else {
+          document.getElementById("output").value = output;
+        }
+        if (outputonerror.length == 0){
+          document.getElementById("outputonerror").value = "";
+        } else {
+          document.getElementById("outputonerror").value = outputonerror;
+        }
+        myModalEditOutput.style.display = "block";
+      }
+
+      function closeEditOutput() {
+        console.log("close task form");
+        myModalEditOutput.style.display = "none";
+      }
+
+      function closeForm() {
+        console.log("close form");
+        modal.style.display = "none";
+        selectedNode = selectedAux;
+        //selectedAux = -1;
+        console.log("selected node: " + selectedNode);
+      }
+
+      function deleteTask(){
+        console.log(selectedNode);
+        if (selectedNode.localeCompare("input") == 0){
+          return;
+        }
+        nodes.remove({ id: selectedNode } );
+        if (selectedNode.localeCompare(connectedInput) == 0){
+          connectedInput = "";
+        }
+        var allEdges = edges.getIds();
+        for (var i = 0; i < allEdges.length; i++){
+          var edge = edges.get(allEdges[i]);
+          console.log(edge);
+          if (edge.from.localeCompare(selectedNode) == 0 || edge.to.localeCompare(selectedNode) == 0){
+            console.log("Removing edge");
+            edges.remove({ id: edge.id } );
+          }
+        }
+        selectedNode = "";
+        hideDeleteTask();
+        saveState();
+      }
+
+      function deleteEdge(){
+        var eg = edges.get(selectedEdge);
+        console.log(eg);
+        if (eg.from.localeCompare("input") == 0 || eg.to.localeCompare("input") == 0){
+          connectedInput = "";
+        }
+        edges.remove({ id: selectedEdge } );
+        selectedEdge = "";
+        hideDeleteEdge();
+        saveState();
+      }
+
+      function saveOutput () {
+        output = document.getElementById("output").value;
+        outputonerror = document.getElementById("outputonerror").value;
+        console.log(output);
+        console.log(outputonerror);
+        closeEditOutput();
+        saveState();
+      }
+
+      function hierarchy() {
+        var checked = document.getElementById("hierarchyCheck").checked;
+        console.log(checked);
+        if (checked){
+          var aux = {layout: {
+					  hierarchical: {
+					  enabled: true,
+					  levelSeparation: 100,
+					  },
+				  }};
+          network.setOptions(aux);
+        } else {
+          var aux = {layout: {
+					  hierarchical: {
+					  enabled: false,
+					  },
+				  }};
+          network.setOptions(aux);
+        }
+      }
+
+      function generate() {
+          var nids = nodes.getIds();
+          var eids = edges.getIds();
+          var result = {"nodes": [], "edges": [], "output": output, "outputonerror": outputonerror};
+          for (var i = 0; i < nids.length; i++){
+            var ne = nodes.get(nids[i]);
+            result.nodes.push(ne);
+          }
+          for (var i = 0; i < eids.length; i++){
+            var edge = edges.get(eids[i]);
+            result.edges.push(edge);
+          }
+
+          vscode.postMessage({
+              command: 'generate',
+              network: JSON.stringify(result, null, 2)
+          });
+      }
+
+      function saveState() {
+          var nids = nodes.getIds();
+          var eids = edges.getIds();
+          var result = {"nodes": [], "edges": []};
+          for (var i = 0; i < nids.length; i++){
+            var ne = nodes.get(nids[i]);
+            result.nodes.push(ne);
+          }
+          for (var i = 0; i < eids.length; i++){
+            var edge = edges.get(eids[i]);
+            result.edges.push(edge);
+          }
+
+          result["output"] = output;
+          result["outputonerror"] = outputonerror;
+
+          vscode.setState(JSON.parse(JSON.stringify(result, null, 2)));
+          
+      }
+
+        // When the user clicks anywhere outside of the modal, close it
+        window.onclick = function(event) {
+          if ((event.target == modal) || (event.target == modalTask) || (event.target == myModalEditTask) || (event.target == myModalEditOutput)) {
+            modal.style.display = "none";
+            modalTask.style.display = "none";
+            myModalEditTask.style.display = "none";
+            myModalEditOutput.style.display = "none";
+          }
+        }
+
+        window.addEventListener('message', event => {
+
+            const message = event.data; // The JSON data our extension sent
+            document.getElementById("hierarchyCheck").checked = false;
+            hierarchy();
+
+            switch (message.command) {
+                case 'loadWorkflow':
+                    let i = 1;
+                    message.payload.nodes.forEach(node => {
+                        setTimeout(() => {
+                          if (node.id.localeCompare("input") != 0){
+                            node.inputs = actionInputs[node.action];
+                          }
+                          nodes.update(node);
+                        }, i * 100);
+                        i++;
+                    });
+                    message.payload.edges.forEach(edge => {
+                        setTimeout(() => {
+                        edges.update(edge);
+                        if (edge.from.localeCompare("input") == 0 || edge.to.localeCompare("input") == 0){
+                          connectedInput = edge.from + "/" + edge.to;
+                          connectedInput = connectedInput.replace("input/", "").replace("/input", "");
+                        }
+                        }, i * 100);
+                        i++;
+                    });
+                    output = message.payload.output || "";
+                    outputonerror = message.payload.outputonerror || "";
+                    setTimeout(() => {
+                      saveState();
+                    }, i * 100);
+                    break;
+            }
+        });
+
+			</script>
+		</body>
+		</html>

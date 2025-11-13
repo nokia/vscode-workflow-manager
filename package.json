@@ -2,7 +2,7 @@
   "name": "nokia-wfm",
   "displayName": "NOKIA_WFM",
   "description": "NOKIA WFM VsCode Developer Plugin",
-  "version": "3.1.0",
+  "version": "4.0.0",
   "icon": "media/Nokia_WFM.png",
   "publisher": "Nokia",
   "engines": { 
@@ -44,6 +44,12 @@
           "type": "null",
           "scope": "window",
          "markdownDescription": "[Set Password](command:nokia-wfm.setPassword)"
+        },
+        "workflowManager.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Enable the extension"
         },
         "workflowManager.port":{
           "type": "string",
@@ -144,6 +150,16 @@
           "command": "nokia-wfm.clearProblems",
           "group": "WFM",
           "when": "(resourceLangId == yaml) && resource =~ /^(?!.*wfm:\\/actions\\/).*$/ && explorerResourceIsFolder"
+        },
+        {
+          "command": "nokia-wfm.openEditor",
+          "group": "WFM",
+          "when": "resource =~ /^wfm:\\/$/"
+        },
+        {
+          "command": "nokia-wfm.openWFEditor",
+          "group": "WFM",
+          "when": "resourceScheme == wfm && resourceExtname == .yaml"
         }
       ]
     },
@@ -153,6 +169,36 @@
         "category": "WFM",
         "title": "Execute Workflow",
         "icon": "$(run)"
+      },
+      {
+        "command": "nokia-wfm.openEditor",
+        "category": "WFM",
+        "title": "Open Workflow Designer"
+      },
+      {
+        "command": "nokia-wfm.deactivate",
+        "category": "WFM",
+        "title": "Deactivate Workflow Manager extension"
+      },
+      {
+        "command": "nokia-wfm.reactivate",
+        "category": "WFM",
+        "title": "Reactivate Workflow Manager extension"
+      },
+      {
+        "command": "nokia-wfm.openWFEditor",
+        "category": "WFM",
+        "title": "Open in Workflow Designer"
+      },
+      {
+        "command": "nokia-wfm.updateEnvironment",
+        "category": "WFM",
+        "title": "Open Workflow Designer"
+      },
+      {
+        "command": "nokia-wfm.updateStatusBar",
+        "category": "WFM",
+        "title": "Open Workflow Designer"
       },
       {
         "command": "nokia-wfm.generateForm",
