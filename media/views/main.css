@@ -1,0 +1,74 @@
+body {
+	background-color: transparent;
+}
+
+.yaql-input {
+	display: block;
+	flex: 1;
+	width: 100%;
+	color: var(--vscode-input-foreground);
+	background-color: var(--vscode-input-background);
+	border: none;
+	padding: 0 0.6em;
+}
+
+.color-ta {
+	display: block;
+	flex: 1;
+	height: 8em;
+	width: 100%;
+	color: var(--vscode-input-foreground);
+	background-color: var(--vscode-input-background);
+	border: none;
+	padding: 0 0.6em;
+	resize: vertical;
+}
+
+.yaql-ta {
+	display: block;
+	flex: 1;
+	height: 8em;
+	width: 100%;
+	color: var(--vscode-input-foreground);
+	background-color: var(--vscode-input-background);
+	border: none;
+	padding: 0 0.6em;
+	resize: vertical;
+}
+
+.context-ta {
+	display: block;
+	flex: 1;
+	height: 8em;
+	width: 100%;
+	color: var(--vscode-input-foreground);
+	background-color: var(--vscode-input-background);
+	border: none;
+	padding: 0 0.6em;
+	resize: vertical;
+}
+
+.try-action-button {
+	display: block;
+	border: none;
+	margin: 0 auto;
+}
+
+.color-select {
+	display: block;
+	flex: 1;
+	width: 100%;
+	height: 2em;
+	color: var(--vscode-input-foreground);
+	background-color: var(--vscode-input-background);
+	border: none;
+	padding: 0 0.6em;
+	margin-bottom: 0.4em;
+}
+
+.add-to-definition {
+	background-color: #00B323;
+}
+.add-to-definition:hover {
+	background-color: #00961F;
+}

@@ -6,3 +6,5 @@
 
 export { WorkflowManagerProvider} from './WorkflowManagerProvider';
 export { CodelensProvider } from './CodelensProvider';
+export { ActionsProvider } from './ViewProvider';
+export { YaqlProvider } from './ViewProvider';

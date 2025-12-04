@@ -2,7 +2,7 @@
   "name": "nokia-wfm",
   "displayName": "NOKIA_WFM",
   "description": "NOKIA WFM VsCode Developer Plugin",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "icon": "media/Nokia_WFM.png",
   "publisher": "Nokia",
   "engines": { 
@@ -17,6 +17,29 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+			"activitybar": [
+				{
+					"id": "wfm-container",
+					"title": "Workflow Manager",
+					"icon": "media/views/connection-flow.svg"
+				}
+			]
+		},
+		"views": {
+			"wfm-container": [
+				{
+					"type": "webview",
+					"id": "workflowManager.actionsView",
+					"name": "WFM Actions"
+				},
+				{
+					"type": "webview",
+					"id": "workflowManager.yaqlView",
+					"name": "YAQLator"
+				}
+			]
+		},
     "snippets": [
       {
         "language": "yaml",

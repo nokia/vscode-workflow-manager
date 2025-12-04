@@ -72,7 +72,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	workflow_views: {[name: string]: FileStat}; // DS for workflow_views
 	workflow_folders: {[name: string]: FileStat}; // DS for workflow_folders
 	pluginLogs: vscode.LogOutputChannel;
-	wfmactions: {};
+	public wfmactions: {};
 	env: string;
 	
 	public onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[] | undefined>;
@@ -1003,6 +1003,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		delete this.workflow_documentations[name.replace('.yaml', '.md')];
 		delete this.workflow_views[name.replace('.yaml', '.json')];
 		delete this.workflow_folders[name.replace('.yaml', '')];
+		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
 	}
 
 	/**
@@ -1484,6 +1485,51 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		});
 		html=html+`</body></html>`;
 		return html;
+	}
+
+	/*
+	 Method to send an action exeution request to NSP
+	*/
+	public async actionExecute(action: String, input: JSON): Promise<JSON> {
+		this.pluginLogs.info('[WFM]: actionExecute()');
+		await this._getAuthToken();
+		const token = await this.authToken;
+		if (!token) {
+            throw vscode.FileSystemError.Unavailable('NSP is not reachable');
+        }
+		
+		let url = 'https://'+this.nspAddr+'/wfm/api/v1/action-execution';
+		let data = {
+			"name": action,
+			"examples": "",
+			"input": input,
+			"description": "Executed from VSCode WFM Extension"
+		};
+
+		const requestHeaders = new fetch.Headers({
+				"Content-Type": "application/json",
+				"Accept": "application/json",
+				'Authorization': 'Bearer ' + token
+			});
+
+		let response: any = await this._callNSP(url, {
+			method: 'POST',
+			body: JSON.stringify(data),
+			headers:requestHeaders
+		});
+		if (!response){
+			throw vscode.FileSystemError.Unavailable("Lost connection to NSP");
+		}
+
+		this.pluginLogs.info("[WFM]: PUT", url, response.status);
+		if (!response.ok) {
+			this.checkResponseStatus(response);
+			throw vscode.FileSystemError.Unavailable('Action execution '+action+' failed! Reason: '+response.statusText);
+		}
+
+		// update workflow view cache
+		let json = await response.json();
+		return json;
 	}
 
 
@@ -2662,9 +2708,14 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 						attribs.forEach((attrib) => {
 							console.log("attrib: " + attrib);
 							try {
-								wfdef[wfname].tasks[ne.label].input[attrib] = YAML.parse(ne.attribs[attrib]);
+								if (attrib === "script"){
+									wfdef[wfname].tasks[ne.label].input[attrib] = ne.attribs[attrib];	
+								} else {
+									wfdef[wfname].tasks[ne.label].input[attrib] = YAML.parse(ne.attribs[attrib]);
+								}
 							} catch {
 								wfdef[wfname].tasks[ne.label].input[attrib] = ne.attribs[attrib];
+								this.pluginLogs.info("Parsed attrib " + attrib + " with value: " + ne.attribs[attrib]);
 							}
 						});
 					}
@@ -2720,7 +2771,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				console.log(YAML.stringify(wfdef));
 
 				if (this._validateWorkflow(YAML.stringify(wfdef))) {
-					await this._writeWorkflow(wfname+".yaml", YAML.stringify(wfdef));
+					await this._writeWorkflow(wfname+".yaml", YAML.stringify(wfdef, {lineWidth: 0}).replace(
+  									/(\n)( {4}[A-Za-z0-9_-]+:\n)/g,
+  									'\n$1$2'
+								).replace(
+  									/(\n)( {2}tasks:\n)(\n)/g,
+  									'\n$1$2'
+								));
 					await vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer');
 					let txtdoc = await vscode.workspace.openTextDocument( vscode.Uri.parse("wfm:/workflows/"+ wfname + "/" + wfname+".yaml"));
 					if (vscode.workspace.textDocuments.includes(txtdoc)){

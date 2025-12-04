@@ -574,7 +574,7 @@ input[type=text], select, textarea {
               console.log(ne.attribs[aux[0]]);
               if (aux.length == 2){
                 if (ne.attribs[aux[0]] != undefined && ne.attribs[aux[0]] != null && ne.attribs[aux[0]].length != 0){
-                  if (ne.attribs[aux[0]].toString().search("\n") != -1) {
+                  if ((ne.attribs[aux[0]].toString().search("\n") != -1) || (longattributes.includes(aux[0]))) {
                     content += '<textarea name="select_'+aux[0]+'" cols="40" rows="4" placeholder="'+escapeHtml(aux[1])+'" id="select_'+aux[0]+'" style="margin: 2px 0;">'+ne.attribs[aux[0]].toString().replaceAll("'",'"')+'</textarea><label for="select_'+aux[0]+'">'+aux[0]+'</label><br>';
                     height += 50;
                   } else {
@@ -590,7 +590,7 @@ input[type=text], select, textarea {
                 }
               } else {
                 if (ne.attribs[aux[0]] != undefined && ne.attribs[aux[0]] != null && ne.attribs[aux[0]].length != 0){
-                  if (ne.attribs[aux[0]].toString().search("\n") != -1) {
+                  if ((ne.attribs[aux[0]].toString().search("\n") != -1) || (longattributes.includes(aux[0]))) {
                     content += '<textarea name="select_'+aux[0]+'" cols="40" rows="4" placeholder="" id="select_'+aux[0]+'" style="margin: 2px 0;">'+ne.attribs[aux[0]].toString().replaceAll("'",'"')+'</textarea><label for="select_'+aux[0]+'">'+aux[0]+'</label><br>';
                     height += 50;
                   } else {

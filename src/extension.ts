@@ -11,7 +11,7 @@ import * as os from 'os'; //  import operating system
 import * as fs from 'fs'; // import filesystem
 
 // WorkflowManagerProvider is a class that contains all workflow operations.
-import { WorkflowManagerProvider, CodelensProvider } from './providers'; 
+import { WorkflowManagerProvider, CodelensProvider, ActionsProvider, YaqlProvider } from './providers'; 
 
 // This function is ran once the the extension is activated:
 export function activate(context: vscode.ExtensionContext) {  
@@ -38,6 +38,14 @@ export function activate(context: vscode.ExtensionContext) {
 	const header = new CodelensProvider(server); 
 	context.subscriptions.push(vscode.languages.registerCodeLensProvider({language: 'yaml', scheme: 'wfm'}, header));
 	context.subscriptions.push(vscode.languages.registerCodeLensProvider({language: 'jinja', scheme: 'wfm'}, header));
+
+	const actionsprovider = new ActionsProvider(context.extensionUri, wfmProvider);
+	context.subscriptions.push(
+		vscode.window.registerWebviewViewProvider(ActionsProvider.viewType, actionsprovider));
+
+	const yaqlprovider = new YaqlProvider(context.extensionUri, wfmProvider);
+	context.subscriptions.push(
+		vscode.window.registerWebviewViewProvider(YaqlProvider.viewType, yaqlprovider));
 
 	// // PUBLISHING COMMANDS
 	// // --- A handler for the 'nokia-wfm.validate' command when the user clicks the checkmark

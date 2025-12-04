@@ -189,23 +189,6 @@ ______
 - Added support for to execute/test Jinja templates within the extension.
 - The user can click on the play button icon on the top right corner of the vscode window, adn it will trigger the user to enter a json input for the jinja template.
 
-### [4.0.0]
-
-### Update the environment for execution
-
-- User can now update the environment to be used, shown at the status bar. DefaultEnv by dafault
-
-### Disable / Enable the WFM fileSystem on runtime without "uninstalling" or "disabling" the extention.
-
-- This can be done to avoid issues. Button accessible at the statud bar (bottom-left).
-
-### Workflow Designer (BETA)
-
-- Workflow designer view. Currently on beta for workflow creation, changes and for flow visualization.
-- Uses vis.js for flow visualization.
-- Large workflows are not nicely displayed. This requires a re-design.
-
-
 <p align="center">
     <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/testTemplate.png" width="500">
 </p>
@@ -267,3 +250,32 @@ ______
 <p align="center">
     <img src="https://raw.githubusercontent.com/AbduAwad/vscode-workflow-manager/main/media/clearProblems.png"  >
 </p>
+
+
+### [4.0.0]
+
+### Update the environment for execution
+
+- User can now update the environment to be used, shown at the status bar. DefaultEnv by dafault
+
+### Disable / Enable the WFM fileSystem on runtime without "uninstalling" or "disabling" the extention.
+
+- This can be done to avoid issues. Button accessible at the statud bar (bottom-left).
+
+### Workflow Designer (BETA)
+
+- Workflow designer view. Currently on beta for workflow creation, changes and for flow visualization.
+- Uses vis.js for flow visualization.
+- Large workflows are not nicely displayed. This requires a re-design.
+
+### [4.1.0]
+
+### Integration of the WFM validator view (YAQLator / Actions)
+
+- Users can now see the full list of actions, get a snippet, try and see the results. If satisfied, users can automatically add the action to their open definition.
+- Users can now test their yaql expressions in the YAQLator. The existing functionality of selecting a YAQL expression and trying it within the workflow definition still remains.
+
+### Bug fixes
+
+- Fix for an issue with deleting and recreating a workflow with the same name
+- Fix for an issue with inconsistent Python and Javascript script content with UI generator
