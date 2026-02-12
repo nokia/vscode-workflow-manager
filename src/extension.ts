@@ -11,7 +11,8 @@ import * as os from 'os'; //  import operating system
 import * as fs from 'fs'; // import filesystem
 
 // WorkflowManagerProvider is a class that contains all workflow operations.
-import { WorkflowManagerProvider, CodelensProvider, ActionsProvider, YaqlProvider } from './providers'; 
+import { WorkflowManagerProvider, CodelensProvider, ActionsProvider, YaqlProvider, WfmTreeProvider } from './providers'; 
+import { WfmTreeItem } from './providers/WfmTreeProvider';
 
 // This function is ran once the the extension is activated:
 export function activate(context: vscode.ExtensionContext) {  
@@ -39,6 +40,16 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.languages.registerCodeLensProvider({language: 'yaml', scheme: 'wfm'}, header));
 	context.subscriptions.push(vscode.languages.registerCodeLensProvider({language: 'jinja', scheme: 'wfm'}, header));
 
+
+	const wfmTreeProvider = new WfmTreeProvider(wfmProvider);
+	context.subscriptions.push(
+		vscode.window.registerTreeDataProvider('workflowManager.wfmTree', wfmTreeProvider)
+	);
+
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.refreshWfmTree', async () => {
+		wfmTreeProvider.refresh();
+	}));
+
 	const actionsprovider = new ActionsProvider(context.extensionUri, wfmProvider);
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(ActionsProvider.viewType, actionsprovider));
@@ -46,6 +57,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const yaqlprovider = new YaqlProvider(context.extensionUri, wfmProvider);
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(YaqlProvider.viewType, yaqlprovider));
+
 
 	// // PUBLISHING COMMANDS
 	// // --- A handler for the 'nokia-wfm.validate' command when the user clicks the checkmark
@@ -96,8 +108,74 @@ export function activate(context: vscode.ExtensionContext) {
 		wfmProvider.openEditor(null);
 	}));
 
-	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.openWFEditor', async (resource: vscode.Uri) => {
-		wfmProvider.openEditor(resource);
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.openWFEditor', async (resource: vscode.Uri | WfmTreeItem) => {
+		if (resource instanceof vscode.Uri) {
+			wfmProvider.openEditor(resource);
+		} else {
+			let auxresource = resource.uri.toString().split('/').pop();
+			resource = vscode.Uri.joinPath(resource.uri, auxresource+".yaml");
+			wfmProvider.openEditor(resource);
+		}
+		vscode.window.showInformationMessage('Open WF Editor: '+resource.toString());
+	}));
+
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.createWorkflow', async () => {
+		let input = await vscode.window.showInputBox({
+			placeHolder: "workflowname",
+			prompt: 'Enter the workflow name',
+			value: ""
+		});
+		if (input && input.length > 0) {
+			await wfmProvider.createDirectory((vscode.Uri.parse('wfm:/workflows/'+input)));
+			await wfmProvider.readDirectory(vscode.Uri.parse('wfm:/workflows/'));
+			wfmTreeProvider.refresh();
+		}
+	}));
+
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.createAction', async () => {
+		let input = await vscode.window.showInputBox({
+			placeHolder: "actionname",
+			prompt: 'Enter the action name',
+			value: ""
+		});
+		if (input && input.length > 0) {
+			if (!input.endsWith('.action')) {
+				input += '.action';
+			} 
+			await wfmProvider.writeFile(vscode.Uri.parse('wfm:/actions/'+input), new Uint8Array(), { create: true, overwrite: true });
+			await wfmProvider.readDirectory(vscode.Uri.parse('wfm:/actions/'));
+			wfmTreeProvider.refresh();
+		}
+	}));
+
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.createTemplate', async () => {
+		let input = await vscode.window.showInputBox({
+			placeHolder: "templatename",
+			prompt: 'Enter the template name',
+			value: ""
+		});
+		if (input && input.length > 0) {
+			if (!input.endsWith('.jinja')) {
+				input += '.jinja';
+			} 
+			await wfmProvider.writeFile(vscode.Uri.parse('wfm:/templates/'+input), new Uint8Array(), { create: true, overwrite: true });
+			await wfmProvider.readDirectory(vscode.Uri.parse('wfm:/templates/'));
+			wfmTreeProvider.refresh();
+		}
+	}));
+
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.deleteWfmResource', async (resource: WfmTreeItem) => {
+		if (!resource) {
+			return;
+		}
+		const selection = await vscode.window.showWarningMessage('Deleting resource: '+resource.uri.toString(), 'Cancel', 'Delete');
+
+		if (selection === "Delete") {
+			await wfmProvider.delete(resource.uri);
+			wfmTreeProvider.refresh();
+		}
+
+		
 	}));
 
 	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.runBestPractices', async () => {
@@ -249,11 +327,11 @@ export function activate(context: vscode.ExtensionContext) {
 
 		statusbar_enabled.command = 'nokia-wfm.deactivate';
 		statusbar_enabled.tooltip = 'Active (click to stop)';
-		statusbar_enabled.text = '⏵ WFM';
+		statusbar_enabled.text = '$(sync) WFM';
 	} else {
 		statusbar_enabled.command = 'nokia-wfm.reactivate';
 		statusbar_enabled.tooltip = 'Deactivated (click to activate)';
-		statusbar_enabled.text = '⏸ WFM';
+		statusbar_enabled.text = '$(sync-ignored) WFM';
 	}
 	statusbar_enabled.show();
 }

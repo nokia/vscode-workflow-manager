@@ -279,3 +279,9 @@ ______
 
 - Fix for an issue with deleting and recreating a workflow with the same name
 - Fix for an issue with inconsistent Python and Javascript script content with UI generator
+
+### [4.2.0]
+
+### WFM workflows list in WFM tab
+
+- Added the workflows list directly in the WFM tab so users can remove the Workflow Manager folder from the workspace.

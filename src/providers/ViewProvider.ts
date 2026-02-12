@@ -116,7 +116,7 @@ export class ActionsProvider implements vscode.WebviewViewProvider {
 							"input": YAML.parse(data.payload)
 						};
 
-						if (workflowdef[key]["tasks"][taskconnect].hasOwnProperty(condition) {
+						if (workflowdef[key]["tasks"][taskconnect].hasOwnProperty(condition)) {
 							if (workflowdef[key]["tasks"][taskconnect][condition] instanceof Array) {
 								workflowdef[key]["tasks"][taskconnect][condition].push(taskName);
 							} else {

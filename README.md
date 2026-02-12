@@ -168,6 +168,7 @@ code --install-extension <path-to-vsix-file>
 * Local files are always treated as workflows. We need a mechanism to differentiate workflows from actions in local folders.
 * In-line validation only works for workflows, not for actions (requires JSON schema for actions).
 * Workflow design (UI) in Beta mode.
+* Having the Workflow Manager folder in the workspace has caused issues to some users, as it may conflict with other extensions and with local folders. To reduce this pain, we included the Workflow Manager folder in the Workflow manager view container, so the user can decide if they want to keep the Workflow Manager in the workspace or remove it. To remove, click the WFM button in the status bar or uncheck the "enable" option in settings.
 
 <br>
 

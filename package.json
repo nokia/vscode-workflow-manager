@@ -2,7 +2,7 @@
   "name": "nokia-wfm",
   "displayName": "NOKIA_WFM",
   "description": "NOKIA WFM VsCode Developer Plugin",
-  "version": "4.1.0",
+  "version": "4.2.0",
   "icon": "media/Nokia_WFM.png",
   "publisher": "Nokia",
   "engines": { 
@@ -37,6 +37,11 @@
 					"type": "webview",
 					"id": "workflowManager.yaqlView",
 					"name": "YAQLator"
+				},
+				{
+					"type": "tree",
+					"id": "workflowManager.wfmTree",
+					"name": "WFM Files"
 				}
 			]
 		},
@@ -109,6 +114,13 @@
       }
     },
     "menus": {
+      "view/title": [
+        {
+          "command": "nokia-wfm.refreshWfmTree",
+          "group": "navigation",
+          "when": "view == workflowManager.wfmTree"
+        }
+      ],
       "editor/title": [
         {
           "when": "resourceScheme != wfm && resourceLangId == yaml",
@@ -184,6 +196,48 @@
           "group": "WFM",
           "when": "resourceScheme == wfm && resourceExtname == .yaml"
         }
+      ],
+      "view/item/context": [
+        {
+          "command": "nokia-wfm.openEditor",
+          "group": "inline",
+          "when": "view == workflowManager.wfmTree && viewItem == 'wfmWorkflowsFolder'"
+        },
+        {
+          "command": "nokia-wfm.createWorkflow",
+          "group": "inline",
+          "when": "view == workflowManager.wfmTree && viewItem == 'wfmWorkflowsFolder'"
+        },
+        {
+          "command": "nokia-wfm.deleteWfmResource",
+          "group": "inline",
+          "when": "view == workflowManager.wfmTree && viewItem == 'wfmWorkflowFolder'"
+        },
+        {
+          "command": "nokia-wfm.openWFEditor",
+          "group": "inline",
+          "when": "view == workflowManager.wfmTree && viewItem == 'wfmWorkflowFolder'"
+        },
+        {
+          "command": "nokia-wfm.createAction",
+          "group": "inline",
+          "when": "view == workflowManager.wfmTree && viewItem == 'wfmActionsFolder'"
+        },
+        {
+          "command": "nokia-wfm.deleteWfmResource",
+          "group": "inline",
+          "when": "view == workflowManager.wfmTree && viewItem == 'wfmActionItem'"
+        },
+        {
+          "command": "nokia-wfm.createTemplate",
+          "group": "inline",
+          "when": "view == workflowManager.wfmTree && viewItem == 'wfmTemplatesFolder'"
+        },
+        {
+          "command": "nokia-wfm.deleteWfmResource",
+          "group": "inline",
+          "when": "view == workflowManager.wfmTree && viewItem == 'wfmTemplateItem'"
+        }
       ]
     },
     "commands": [
@@ -196,7 +250,8 @@
       {
         "command": "nokia-wfm.openEditor",
         "category": "WFM",
-        "title": "Open Workflow Designer"
+        "title": "Open Workflow Designer",
+        "icon": "$(beaker)"
       },
       {
         "command": "nokia-wfm.deactivate",
@@ -211,7 +266,8 @@
       {
         "command": "nokia-wfm.openWFEditor",
         "category": "WFM",
-        "title": "Open in Workflow Designer"
+        "title": "Open in Workflow Designer",
+        "icon": "$(beaker)"
       },
       {
         "command": "nokia-wfm.updateEnvironment",
@@ -286,6 +342,36 @@
         "category": "WFM",
         "title": "Clear All Problems",
         "icon": "$(clear-all)"
+      },
+      {
+        "command": "nokia-wfm.createWorkflow",
+        "category": "WFM",
+        "title": "Create Workflow",
+        "icon": "$(add)"
+      },
+      {
+        "command": "nokia-wfm.createAction",
+        "category": "WFM",
+        "title": "Create Action",
+        "icon": "$(add)"
+      },
+      {
+        "command": "nokia-wfm.createTemplate",
+        "category": "WFM",
+        "title": "Create Template",
+        "icon": "$(add)"
+      },
+      {
+        "command": "nokia-wfm.deleteWfmResource",
+        "category": "WFM",
+        "title": "Delete WFM Resource",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "nokia-wfm.refreshWfmTree",
+        "category": "WFM",
+        "title": "Refresh WFM Files",
+        "icon": "$(refresh)"
       }
     ]
   },
