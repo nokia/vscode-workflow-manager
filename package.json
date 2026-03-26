@@ -2,10 +2,10 @@
   "name": "nokia-wfm",
   "displayName": "NOKIA_WFM",
   "description": "NOKIA WFM VsCode Developer Plugin",
-  "version": "4.2.0",
+  "version": "4.2.1",
   "icon": "media/Nokia_WFM.png",
   "publisher": "Nokia",
-  "engines": { 
+  "engines": {
     "vscode": "^1.76.0"
   },
   "categories": [
@@ -18,33 +18,33 @@
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
-			"activitybar": [
-				{
-					"id": "wfm-container",
-					"title": "Workflow Manager",
-					"icon": "media/views/connection-flow.svg"
-				}
-			]
-		},
-		"views": {
-			"wfm-container": [
-				{
-					"type": "webview",
-					"id": "workflowManager.actionsView",
-					"name": "WFM Actions"
-				},
-				{
-					"type": "webview",
-					"id": "workflowManager.yaqlView",
-					"name": "YAQLator"
-				},
-				{
-					"type": "tree",
-					"id": "workflowManager.wfmTree",
-					"name": "WFM Files"
-				}
-			]
-		},
+      "activitybar": [
+        {
+          "id": "wfm-container",
+          "title": "Workflow Manager",
+          "icon": "media/views/connection-flow.svg"
+        }
+      ]
+    },
+    "views": {
+      "wfm-container": [
+        {
+          "type": "webview",
+          "id": "workflowManager.actionsView",
+          "name": "WFM Actions"
+        },
+        {
+          "type": "webview",
+          "id": "workflowManager.yaqlView",
+          "name": "YAQLator"
+        },
+        {
+          "type": "tree",
+          "id": "workflowManager.wfmTree",
+          "name": "WFM Files"
+        }
+      ]
+    },
     "snippets": [
       {
         "language": "yaml",
@@ -71,7 +71,7 @@
           "description": "NSP password",
           "type": "null",
           "scope": "window",
-         "markdownDescription": "[Set Password](command:nokia-wfm.setPassword)"
+          "markdownDescription": "[Set Password](command:nokia-wfm.setPassword)"
         },
         "workflowManager.enabled": {
           "type": "boolean",
@@ -79,7 +79,7 @@
           "scope": "window",
           "description": "Enable the extension"
         },
-        "workflowManager.port":{
+        "workflowManager.port": {
           "type": "string",
           "default": "443",
           "scope": "window",
@@ -106,8 +106,8 @@
         "workflowManager.ignoreTags": {
           "type": "array",
           "scope": "application",
-            "items": {
-                "type": "string"
+          "items": {
+            "type": "string"
           },
           "description": "Workflows with these tags will be hidden."
         }
@@ -180,7 +180,7 @@
           "when": "editorLangId == yaml && editorHasSelection"
         }
       ],
-      "explorer/context":[
+      "explorer/context": [
         {
           "command": "nokia-wfm.clearProblems",
           "group": "WFM",
@@ -408,10 +408,10 @@
     "nunjucks": "^3.2.0",
     "vscode-uri": "^3.0.0",
     "yaml": "^2.2.0",
-		"@vscode/codicons": "0.0.20"
+    "@vscode/codicons": "0.0.20"
   },
   "repository": {
-      "type": "git",
-      "url": "https://github.com/nokia/vscode-workflow-manager.git"
+    "type": "git",
+    "url": "https://github.com/nokia/vscode-workflow-manager.git"
   }
 }
