@@ -1,8 +1,6 @@
 .git/**
 .github/**
 .vscode/**
-node_modules/**
-src/**
 tsconfig.json
 .gitignore
 .eslintrc.js
