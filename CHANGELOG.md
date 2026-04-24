@@ -286,6 +286,20 @@ ______
 
 - Added the workflows list directly in the WFM tab so users can remove the Workflow Manager folder from the workspace.
 
+### [4.2.1]
+
+### CI/CD pipeline
+
+- Added GitHub Actions workflows: `ci.yml` for continuous integration and `vsix.yml` for releases.
+- `ci.yml` runs on every push to `main` and on pull requests: ESLint, TypeScript type-check, esbuild bundle check, `npm audit` security scan, and a dependency-review comment on PRs.
+- `vsix.yml` is a manual release workflow that bumps `package.json`, tags the commit, packages the VSIX via `vsce package`, creates a GitHub Release with the artifact attached, and optionally publishes to the VS Marketplace when a `VSCE_TOKEN` secret is configured.
+- Added `.eslintrc.js` to provide ESLint configuration required by the `npm run lint` script.
+
+### Security fixes
+
+- Bumped `node-fetch` from `2.6.6` to `^2.6.7` to resolve a high-severity vulnerability where secure request headers were forwarded to untrusted redirect targets ([GHSA-r683-j2x4-v87g](https://github.com/advisories/GHSA-r683-j2x4-v87g)).
+- Applied `npm audit fix` to resolve moderate/high vulnerabilities in transitive dev dependencies (`picomatch`, `yaml`, `brace-expansion`, `minimatch`, `micromatch`, `flatted`, `js-yaml`, `ajv`, `cross-spawn`, `diff`). Production dependencies are now vulnerability-free.
+
 ### [4.3.0]
 
 ### Try actions before adding them to a workflow

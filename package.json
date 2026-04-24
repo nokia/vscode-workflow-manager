@@ -5,7 +5,7 @@
   "version": "4.3.0",
   "icon": "media/Nokia_WFM.png",
   "publisher": "Nokia",
-  "engines": { 
+  "engines": {
     "vscode": "^1.76.0"
   },
   "categories": [
@@ -71,7 +71,7 @@
           "description": "NSP password",
           "type": "null",
           "scope": "window",
-         "markdownDescription": "[Set Password](command:nokia-wfm.setPassword)"
+          "markdownDescription": "[Set Password](command:nokia-wfm.setPassword)"
         },
         "workflowManager.enabled": {
           "type": "boolean",
@@ -79,7 +79,7 @@
           "scope": "window",
           "description": "Enable the extension"
         },
-        "workflowManager.port":{
+        "workflowManager.port": {
           "type": "string",
           "default": "443",
           "scope": "window",
@@ -106,8 +106,8 @@
         "workflowManager.ignoreTags": {
           "type": "array",
           "scope": "application",
-            "items": {
-                "type": "string"
+          "items": {
+            "type": "string"
           },
           "description": "Workflows with these tags will be hidden."
         }
@@ -180,7 +180,7 @@
           "when": "editorLangId == yaml && editorHasSelection"
         }
       ],
-      "explorer/context":[
+      "explorer/context": [
         {
           "command": "nokia-wfm.clearProblems",
           "group": "WFM",
@@ -383,7 +383,7 @@
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
-    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node --packages=external",
+    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --packages=external",
     "esbuild": "npm run esbuild-base -- --sourcemap",
     "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
     "test-compile": "./node_modules/typescript/bin/tsc -p ./"
@@ -404,14 +404,14 @@
   },
   "dependencies": {
     "base-64": "^1.0.0",
-    "node-fetch": "2.6.6",
+    "node-fetch": "^2.6.7",
     "nunjucks": "^3.2.0",
     "vscode-uri": "^3.0.0",
     "yaml": "^2.2.0",
-		"@vscode/codicons": "0.0.20"
+    "@vscode/codicons": "0.0.20"
   },
   "repository": {
-      "type": "git",
-      "url": "https://github.com/nokia/vscode-workflow-manager.git"
+    "type": "git",
+    "url": "https://github.com/nokia/vscode-workflow-manager.git"
   }
 }
