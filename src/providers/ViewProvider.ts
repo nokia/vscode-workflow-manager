@@ -250,26 +250,38 @@ export class YaqlProvider implements vscode.WebviewViewProvider {
 
 		webviewView.webview.onDidReceiveMessage( async data => {
 			switch (data.type) {
-				case 'yaql':
+				case 'filter':
 					{
-						let payload = {};
-						if (data.context || data.context.trim() !== "") {
+						const action = data.action as string;
+						const code = data.code as string;
+						let contextPayload: unknown = {};
+						if (data.context && String(data.context).trim() !== "") {
 							try {
-								payload = JSON.parse(data.context);
+								contextPayload = JSON.parse(data.context);
 							} catch (e) {
 								try {
-									payload = YAML.parse(data.context);
+									contextPayload = YAML.parse(data.context);
 								} catch (e) {
 									vscode.window.showErrorMessage("Context data is not valid JSON or YAML.");
 									return;
 								}
 							}
 						}
-						let response = await this.nspProvider.actionExecute('nsp.yaql_eval',{ "context": payload,"expression": data.expression});
+						const input: Record<string, unknown> =
+							action === 'nsp.yaql_eval'
+								? { context: contextPayload, expression: code }
+								: { context: contextPayload, script: code };
+						const response = await this.nspProvider.actionExecute(action, input as unknown as JSON);
 						testLogs.clear();
 						testLogs.show(true);
-						testLogs.info(`YAQL Expression: ${data.expression}`);
-						testLogs.info(`YAQL Response:\n`+YAML.stringify(response["response"]["data"][0]["output"]["result"],{lineWidth:0})+`\n`);
+						const label =
+							action === 'nsp.yaql_eval'
+								? 'YAQL expression'
+								: action === 'nsp.python'
+									? 'Python script'
+									: 'JavaScript';
+						testLogs.info(`${label} (${action}):\n${code}`);
+						testLogs.info(`Response:\n`+YAML.stringify(response["response"]["data"][0]["output"]["result"],{lineWidth:0})+`\n`);
 						break;
 					}
 			}
@@ -308,11 +320,15 @@ export class YaqlProvider implements vscode.WebviewViewProvider {
 				<link href="${styleVSCodeUri}" rel="stylesheet">
 				<link href="${styleMainUri}" rel="stylesheet">
 
-				<title>Cat Colors</title>
+				<title>WFM filters</title>
 			</head>
 			<body>
-				
-				<input type="text" class="yaql-input" id="yaqlexpression" placeholder="Enter YAQL expression"/>
+				<select class="color-select" id="filterType" aria-label="Filter language">
+					<option value="yaql" selected>YAQL</option>
+					<option value="python">Python</option>
+					<option value="javascript">JavaScript</option>
+				</select>
+				<textarea cols="7" rows="6" class="yaql-ta yaql-expression-ta" id="yaqlexpression" placeholder="Enter YAQL expression"></textarea>
 				<textarea cols="7" class="yaql-ta" id="contextdatayq" placeholder="Enter context data (YAML / JSON)"></textarea>
 
 				<button class="try-yaql-button" id="sendYaql">Try out</button>

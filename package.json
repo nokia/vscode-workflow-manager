@@ -2,7 +2,7 @@
   "name": "nokia-wfm",
   "displayName": "NOKIA_WFM",
   "description": "NOKIA WFM VsCode Developer Plugin",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "icon": "media/Nokia_WFM.png",
   "publisher": "Nokia",
   "engines": { 
@@ -36,7 +36,7 @@
 				{
 					"type": "webview",
 					"id": "workflowManager.yaqlView",
-					"name": "YAQLator"
+					"name": "WFM filters"
 				},
 				{
 					"type": "tree",
@@ -75,7 +75,7 @@
         },
         "workflowManager.enabled": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "scope": "window",
           "description": "Enable the extension"
         },

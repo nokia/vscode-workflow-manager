@@ -47,15 +47,36 @@
     } catch (error) {
         console.log("No color select element found.");
     }
-    try { // YAQL actions
+    try { // WFM filters (YAQL / Python / JavaScript)
+        const filterTypeSelect = document.getElementById('filterType');
+        const codeInput = document.getElementById('yaqlexpression');
+        const actionsByMode = {
+            yaql: 'nsp.yaql_eval',
+            python: 'nsp.python',
+            javascript: 'std.javascript'
+        };
+        const placeholdersByMode = {
+            yaql: 'Enter YAQL expression',
+            python: 'Enter Python script',
+            javascript: 'Enter JavaScript'
+        };
+        function syncFilterPlaceholder() {
+            const mode = filterTypeSelect.value;
+            codeInput.placeholder = placeholdersByMode[mode] || '';
+        }
+        filterTypeSelect.addEventListener('change', syncFilterPlaceholder);
+        syncFilterPlaceholder();
         document.getElementById('sendYaql').addEventListener('click', () => {
-            let expression = document.getElementById("yaqlexpression").value;
-            let context = document.getElementById("contextdatayq").value;
-            vscode.postMessage({ type: 'yaql', expression: expression, context: context });
-
+            const mode = filterTypeSelect.value;
+            vscode.postMessage({
+                type: 'filter',
+                action: actionsByMode[mode],
+                code: codeInput.value,
+                context: document.getElementById('contextdatayq').value
+            });
         });
     } catch (error) {
-        console.log("No YAQL button found.");
+        console.log("No WFM filters UI found.");
     }
 
 

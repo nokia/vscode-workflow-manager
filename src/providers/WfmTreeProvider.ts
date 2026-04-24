@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { WorkflowManagerProvider } from './WorkflowManagerProvider';
 
-class WfmTreeItem extends vscode.TreeItem {
+export class WfmTreeItem extends vscode.TreeItem {
 	readonly uri: vscode.Uri;
 	readonly type: vscode.FileType;
 

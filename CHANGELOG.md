@@ -285,3 +285,15 @@ ______
 ### WFM workflows list in WFM tab
 
 - Added the workflows list directly in the WFM tab so users can remove the Workflow Manager folder from the workspace.
+
+### [4.3.0]
+
+### Try actions before adding them to a workflow
+
+- In the **WFM Actions** sidebar view, you can pick an action, edit its inputs (and optional context for Python and JavaScript), then use **Try out** to run the action against the server and inspect the result in the output channel.
+- This lets you validate behaviour and payloads before you use **Add to workflow**, which inserts the action as a new task into the workflow you currently have open in the editor.
+
+### WFM filters: validate YAQL, Python, and JavaScript
+
+- The **WFM filters** view (formerly YAQLator) generalises filter-style checks: choose **YAQL**, **Python**, or **JavaScript**, enter a multi-line expression or script, provide optional context as JSON or YAML, and run **Try out** to execute `nsp.yaql_eval`, `nsp.python`, or `std.javascript` respectively and view the result in the logs.
+- YAQL uses `expression` plus `context`; Python and JavaScript use `script` plus `context`, aligned with the underlying WFM actions.

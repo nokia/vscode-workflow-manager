@@ -36,6 +36,11 @@ body {
 	resize: vertical;
 }
 
+.yaql-expression-ta {
+	min-height: 6em;
+	margin-bottom: 0.4em;
+}
+
 .context-ta {
 	display: block;
 	flex: 1;
