@@ -638,13 +638,13 @@ input[type=text], select, textarea {
         document.getElementById("econdition").value = "";
         console.log(condition);
         if (condition.localeCompare("on-success")==0){
-          edges.update({ from: selectedNode, to: selectedAux, arrows: "to", dashes: true, color: "#0eb200", condition: "on-success" });
+          edges.update({ from: selectedNode, to: selectedAux, arrows: "to", dashes: true, color: "#0eb200", condition: "on-success", econdition: extra});
           console.log("I am here");  
         } else if (condition.localeCompare("on-error")==0){
-          edges.update({ from: selectedNode, to: selectedAux, arrows: "to", dashes: true, color: "#d5402e", condition: "on-error" });
+          edges.update({ from: selectedNode, to: selectedAux, arrows: "to", dashes: true, color: "#d5402e", condition: "on-error", econdition: extra });
           console.log("Not here");  
         } else {
-          edges.update({ from: selectedNode, to: selectedAux, arrows: "to", dashes: true, condition: "on-complete" });
+          edges.update({ from: selectedNode, to: selectedAux, arrows: "to", dashes: true, condition: "on-complete", econdition: extra });
         }
         saveState();
         closeForm();

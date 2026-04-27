@@ -53,6 +53,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const actionsprovider = new ActionsProvider(context.extensionUri, wfmProvider);
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(ActionsProvider.viewType, actionsprovider));
+	context.subscriptions.push(vscode.commands.registerCommand('nokia-wfm.refreshWfmActions', () => actionsprovider.refresh()));
 
 	const yaqlprovider = new YaqlProvider(context.extensionUri, wfmProvider);
 	context.subscriptions.push(

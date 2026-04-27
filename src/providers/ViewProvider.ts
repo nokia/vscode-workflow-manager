@@ -30,6 +30,20 @@ export class ActionsProvider implements vscode.WebviewViewProvider {
 		this._nspProvider = nspProvider;
 	}
 
+	/** Reload actions from NSP and rebuild the webview. */
+	public async refresh(): Promise<void> {
+		if (!this._view) {
+			return;
+		}
+		try {
+			await this.nspProvider.generateSchema();
+			this._view.webview.html = await this._getHtmlForWebview(this._view.webview);
+		} catch (e) {
+			const message = e instanceof Error ? e.message : String(e);
+			vscode.window.showErrorMessage(`Failed to refresh WFM actions: ${message}`);
+		}
+	}
+
 	public async resolveWebviewView(
 		webviewView: vscode.WebviewView,
 		_context: vscode.WebviewViewResolveContext,

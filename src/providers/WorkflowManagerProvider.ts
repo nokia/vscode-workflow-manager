@@ -2478,17 +2478,17 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 							taskDef["on-success"].forEach((successTask) => {
 								this.pluginLogs.info(typeof successTask);
 								if (typeof successTask === "string") {
-									payload.edges.push({from: task, to: successTask, arrows: "to", dashes: true, color: "#0eb200", condition: "on-success" });
+									payload.edges.push({from: task, to: successTask, arrows: "to", dashes: true, color: "#0eb200", condition: "on-success", econdition: "" });
 								} else {
-									payload.edges.push({from: task, to: Object.keys(successTask)[0], arrows: "to", dashes: true, color: "#0eb200", condition: "on-success" });
+									payload.edges.push({from: task, to: Object.keys(successTask)[0], arrows: "to", dashes: true, color: "#0eb200", condition: "on-success", econdition: successTask[Object.keys(successTask)[0]] });
 								}
 							});
 						} else {
 							let successTask = taskDef["on-success"];
 							if (typeof successTask === "string") {
-								payload.edges.push({from: task, to: successTask, arrows: "to", dashes: true, color: "#0eb200", condition: "on-success" });
+								payload.edges.push({from: task, to: successTask, arrows: "to", dashes: true, color: "#0eb200", condition: "on-success", econdition: "" });
 							} else {
-								payload.edges.push({from: task, to: Object.keys(successTask)[0], arrows: "to", dashes: true, color: "#0eb200", condition: "on-success" });
+								payload.edges.push({from: task, to: Object.keys(successTask)[0], arrows: "to", dashes: true, color: "#0eb200", condition: "on-success", econdition: successTask[Object.keys(successTask)[0]] });
 							}
 						}
 					}
@@ -2498,17 +2498,17 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 							taskDef["on-error"].forEach((failureTask) => {
 								this.pluginLogs.info(typeof failureTask);
 								if (typeof failureTask === "string") {
-									payload.edges.push({from: task, to: failureTask, arrows: "to", dashes: true,  color: "#d5402e", condition: "on-error" });
+									payload.edges.push({from: task, to: failureTask, arrows: "to", dashes: true,  color: "#d5402e", condition: "on-error", econdition: "" });
 								} else {
-									payload.edges.push({from: task, to: Object.keys(failureTask)[0], arrows: "to", dashes: true,  color: "#d5402e", condition: "on-error" });
+									payload.edges.push({from: task, to: Object.keys(failureTask)[0], arrows: "to", dashes: true,  color: "#d5402e", condition: "on-error", econdition: failureTask[Object.keys(failureTask)[0]] });
 								}						
 							});
 						} else {
 							let failureTask = taskDef["on-error"]
 							if (typeof failureTask === "string") {
-								payload.edges.push({from: task, to: failureTask, arrows: "to", dashes: true,  color: "#d5402e", condition: "on-error" });
+								payload.edges.push({from: task, to: failureTask, arrows: "to", dashes: true,  color: "#d5402e", condition: "on-error", econdition: "" });
 							} else {
-								payload.edges.push({from: task, to: Object.keys(failureTask)[0], arrows: "to", dashes: true,  color: "#d5402e", condition: "on-error" });
+								payload.edges.push({from: task, to: Object.keys(failureTask)[0], arrows: "to", dashes: true,  color: "#d5402e", condition: "on-error", econdition: failureTask[Object.keys(failureTask)[0]] });
 							}	
 						}
 					}
@@ -2518,9 +2518,9 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 							taskDef["on-complete"].forEach((completionTask) => {
 								this.pluginLogs.info(typeof completionTask);
 								if (typeof completionTask === "string") {
-									payload.edges.push({from: task, to: completionTask, arrows: "to", dashes: true, condition: "on-complete" });
+									payload.edges.push({from: task, to: completionTask, arrows: "to", dashes: true, condition: "on-complete", econdition: "" });
 								} else {
-									payload.edges.push({from: task, to: Object.keys(completionTask)[0], arrows: "to", dashes: true, condition: "on-complete" });
+									payload.edges.push({from: task, to: Object.keys(completionTask)[0], arrows: "to", dashes: true, condition: "on-complete", econdition: completionTask[Object.keys(completionTask)[0]] });
 								}
 							});
 						} else {
@@ -2529,7 +2529,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 							if (typeof completionTask === "string") {
 								payload.edges.push({from: task, to: completionTask, arrows: "to", dashes: true, condition: "on-complete" });
 							} else {
-								payload.edges.push({from: task, to: Object.keys(completionTask)[0], arrows: "to", dashes: true, condition: "on-complete" });
+								payload.edges.push({from: task, to: Object.keys(completionTask)[0], arrows: "to", dashes: true, condition: "on-complete", econdition: completionTask[Object.keys(completionTask)[0]] });
 							}
 						}
 					}
@@ -2746,6 +2746,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 					let fromTask = network.nodes.find(n => n.id === edge.from).label;
 					let toTask = network.nodes.find(n => n.id === edge.to).label;
 					let condition = edge.condition ? edge.condition : "on-complete";
+					let econdition = edge.econdition ? edge.econdition : "";
 					if (Object.keys(wfdef[wfname].tasks[fromTask]).indexOf(condition) === -1) {
 						wfdef[wfname].tasks[fromTask][condition] = [];
 					}
@@ -2753,7 +2754,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 						wfdef[wfname].tasks[fromTask][condition] = [];
 					}
 					if (!wfdef[wfname].tasks[fromTask][condition].includes(toTask)){
-						wfdef[wfname].tasks[fromTask][condition].push(toTask); // TODO: Error when processing string (on-complete, on-success, etc.), no list...
+						if (econdition.length > 0) {
+							let auxentry = {};
+							auxentry[toTask] = econdition;
+							wfdef[wfname].tasks[fromTask][condition].push(auxentry);
+						} else {
+							wfdef[wfname].tasks[fromTask][condition].push(toTask); // TODO: Error when processing string (on-complete, on-success, etc.), no list...
+						}
 					}
 					console.log("Adding " + toTask + " to " + fromTask + " " + condition);
 				}

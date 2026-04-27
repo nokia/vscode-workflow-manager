@@ -2,7 +2,7 @@
   "name": "nokia-wfm",
   "displayName": "NOKIA_WFM",
   "description": "NOKIA WFM VsCode Developer Plugin",
-  "version": "4.3.0",
+  "version": "4.3.1",
   "icon": "media/Nokia_WFM.png",
   "publisher": "Nokia",
   "engines": {
@@ -119,6 +119,11 @@
           "command": "nokia-wfm.refreshWfmTree",
           "group": "navigation",
           "when": "view == workflowManager.wfmTree"
+        },
+        {
+          "command": "nokia-wfm.refreshWfmActions",
+          "group": "navigation",
+          "when": "view == workflowManager.actionsView"
         }
       ],
       "editor/title": [
@@ -371,6 +376,12 @@
         "command": "nokia-wfm.refreshWfmTree",
         "category": "WFM",
         "title": "Refresh WFM Files",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "nokia-wfm.refreshWfmActions",
+        "category": "WFM",
+        "title": "Refresh WFM Actions",
         "icon": "$(refresh)"
       }
     ]
