@@ -30,7 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
 	let enabled : boolean = config.get("enabled") ?? true;
 	const statusbar_enabled = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 90);
 
-	const wfmProvider = new WorkflowManagerProvider(server, username, secretStorage, port, localsave, localpath, timeout, fileIgnore);
+	const wfmProvider = new WorkflowManagerProvider(server, username, secretStorage, port, localsave, localpath, timeout, fileIgnore, enabled);
 	
 	context.subscriptions.push(vscode.workspace.registerFileSystemProvider('wfm', wfmProvider, { isCaseSensitive: true }));
 	context.subscriptions.push(vscode.window.registerFileDecorationProvider(wfmProvider));

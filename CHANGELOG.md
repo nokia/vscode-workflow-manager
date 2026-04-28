@@ -315,3 +315,10 @@ ______
 ### Workflow editor (visual designer)
 
 - **Extra conditions on transitions** in the visual designer: when adding a connection between tasks, the optional extra-condition field is now written to the edge so it is preserved in the graph state and saved back to the workflow YAML. The generated designer HTML was updated to match the template behaviour (the value was read from the form but not stored on the edge).
+
+### [4.3.2]
+
+### Bug fixes
+
+- **Explorer refresh:** When **`workflowManager.enabled`** is disabled (Workflow Manager virtual folder not shown in the Explorer), internal updates still refresh the **WFM Files** tree but **no longer** run **Refresh Explorer** on the built-in **Files** view, avoiding automatic explorer refreshes while the Workflow Manager folder is absent from that view.
+- **YAML validation schema:** Regenerating the workflow JSON Schema no longer leaves duplicate Red Hat YAML schema associations for the same workflows. Stale entries keyed by older packaged-extension paths (`nokia.nokia-wfm`) are removed before applying the single generated `wfm-schema.json` mapping for `wfm:/workflows/*/*`, avoiding conflicting or repeated schemas on WFM YAML files.

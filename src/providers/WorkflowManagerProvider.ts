@@ -74,6 +74,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	pluginLogs: vscode.LogOutputChannel;
 	public wfmactions: {};
 	env: string;
+	explorerEnabled: boolean; // whether the file explorer is enabled
 	
 	public onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[] | undefined>;
     private _eventEmiter: vscode.EventEmitter<vscode.Uri | vscode.Uri[]>;
@@ -90,7 +91,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 	 * @param {fileIgnore} fileIgnore hide intent-types with provided labels to keep filesystem clean
 	*/	
 
-	constructor (nspAddr: string, username: string, secretStorage: vscode.SecretStorage, port: string, localsave: boolean, localpath: string, timeout: number, fileIgnore: Array<string>) {
+	constructor (nspAddr: string, username: string, secretStorage: vscode.SecretStorage, port: string, localsave: boolean, localpath: string, timeout: number, fileIgnore: Array<string>, enabled: boolean) {
 		this.nspAddr = nspAddr;
 		this.username = username;
 		this.authToken = undefined;
@@ -120,6 +121,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 
 		this.localsave = localsave;
 		this.localpath = localpath;
+
+		this.explorerEnabled = enabled;
 	}
 
 	dispose() {
@@ -135,6 +138,15 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			throw new Error(`Please verify with the connected NSP WFM, as the connected NSP may not have WFM available. Please check the WFM Plugin Logs for more details.`);
 		}
 	}
+
+	/** When the file explorer integration is on, refresh it and the WFM tree; otherwise only the WFM tree. */
+	private async _refreshFileExplorerAndWfmTree(): Promise<void> {
+		if (this.explorerEnabled) {
+			await vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer');
+		}
+		await vscode.commands.executeCommand('nokia-wfm.refreshWfmTree');
+	}
+
 	/**
 	* Retrieves auth-token from NSP. Implementation uses promises to ensure that only
 	* one token is used at any given moment of time. The token will automatically be
@@ -621,7 +633,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			this.templates[name].mtime = Date.parse(entry.updated_at);
 			this.templates[name].size  = data.length;	
 		}
-		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+		await this._refreshFileExplorerAndWfmTree();
 		this.saveBackupLocally(name, data);
 		this.pluginLogs.info('[WFM]: completed updating template');
 	}
@@ -684,7 +696,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const mtime = Date.parse(entry.updated_at);
 		this.templates[name] = new FileStat(id, 'file', ctime, mtime, data.length, false);
 
-		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+		await this._refreshFileExplorerAndWfmTree();
 		vscode.window.showInformationMessage('Success: Template published');
 	}
 
@@ -820,7 +832,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			this.checkResponseStatus(response);
 			throw vscode.FileSystemError.Unavailable('Change mode to PUBLISHED failed! Reason: '+response.statusText);
 		}
-		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+		await this._refreshFileExplorerAndWfmTree();
 		vscode.window.showInformationMessage('Success: Workflow ' + temp_name + ' published');
 		this.pluginLogs.info("[WFM]: completed createWorkflow()");
 	}
@@ -948,7 +960,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 				throw vscode.FileSystemError.Unavailable('Change mode to PUBLISHED failed!');
 			}
 			vscode.window.showInformationMessage('Success: Workflow ' + name + ' published');
-			await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+			await this._refreshFileExplorerAndWfmTree();
 			this.saveBackupLocally(name, data);
 		}
 		this.pluginLogs.info('[WFM]: completed updating workflow');
@@ -1003,7 +1015,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		delete this.workflow_documentations[name.replace('.yaml', '.md')];
 		delete this.workflow_views[name.replace('.yaml', '.json')];
 		delete this.workflow_folders[name.replace('.yaml', '')];
-		await vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+		await this._refreshFileExplorerAndWfmTree();
 	}
 
 	/**
@@ -1219,7 +1231,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const ctime = Date.parse(entry.created_at);
 		const mtime = Date.parse(entry.updated_at);
 		this.actions[name] = new FileStat(id, 'file', ctime, mtime, data.length, false);
-		vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+		await this._refreshFileExplorerAndWfmTree();
 	}
 
 	/**
@@ -1980,6 +1992,11 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		const wfmSchema = outpath; // get the path to the schema
 		const workflowUri = "wfm:/workflows/*/*"; // get the uri for the workflow
 		let schemas = vscode.workspace.getConfiguration('yaml').get('schemas'); // get the schemas from the workspace
+		for (const key of Object.keys(schemas)) {
+			if (key.includes("nokia.nokia-wfm")) {
+				schemas[key] = undefined;
+			}
+		}
 		if (schemas[wfmSchema]) { // if the schema is already in the schemas
 			if (Array.isArray(schemas[wfmSchema])) { // if the schema is an array
 				if (schemas[wfmSchema].indexOf(workflowUri) === -1) { // if the workflow uri is not in the schema
@@ -2785,7 +2802,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
   									/(\n)( {2}tasks:\n)(\n)/g,
   									'\n$1$2'
 								));
-					await vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer');
+					await this._refreshFileExplorerAndWfmTree();
 					let txtdoc = await vscode.workspace.openTextDocument( vscode.Uri.parse("wfm:/workflows/"+ wfname + "/" + wfname+".yaml"));
 					if (vscode.workspace.textDocuments.includes(txtdoc)){
 						await vscode.window.showTextDocument(txtdoc,vscode.ViewColumn.One);
@@ -3578,7 +3595,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.fileIgnore = config.get('ignoreTags') ?? [];
 		this.localsave = config.get("localStorage.enable") ?? false;
 		this.localpath = config.get("localStorage.folder") ?? "";
-
+		this.explorerEnabled = config.get("enabled") ?? true;
 		const nsp:string = config.get('NSPIP') ?? 'localhost';
 		const user:string = config.get("user") ?? "admin";
 		const port:string = config.get("port") ?? "443";
@@ -3605,7 +3622,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.actions = {};
 		this.templates = {};
 		this.generateSchema();
-		vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer');
+		await this._refreshFileExplorerAndWfmTree();
 	}
 
 
