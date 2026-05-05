@@ -1635,10 +1635,10 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		this.pluginLogs.info("[WFM]: applySchema()");
 		const editor = vscode.window.activeTextEditor; // get the active text editor
 		const extURI = this.extContext.extensionUri;
-		let outpath = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema.json').toString().replace("file://","");
+		const wfmSchemaUri = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema.json');
+		const wfmSchema = wfmSchemaUri.fsPath;
 		if (editor) {
 			const document = editor.document;
-			const wfmSchema = outpath;
 			const workflowUri = document.uri.toString();
 			let schemas = vscode.workspace.getConfiguration('yaml').get('schemas');
 			if (schemas[wfmSchema]) {
@@ -1867,11 +1867,12 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 		let config = vscode.workspace.getConfiguration('workflowManager');
 		const extURI = this.extContext.extensionUri;
-		let templatePath = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema-builder.json.j2').toString().replace("file://","");
-		let outpath = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema.json').toString().replace("file://","");
-		let snippetsfile = vscode.Uri.joinPath(extURI, 'schema', 'snippets.json').toString().replace("file://","");
-		let ntwTemplate = vscode.Uri.joinPath(extURI, 'src', 'html', 'network.html.j2').toString().replace("file://","");
-		let ntwOutput = vscode.Uri.joinPath(extURI, 'src', 'html', 'network.html').toString().replace("file://","");
+		const templatePath = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema-builder.json.j2').fsPath;
+		const schemaOutUri = vscode.Uri.joinPath(extURI, 'schema', 'wfm-schema.json');
+		const outpath = schemaOutUri.fsPath;
+		const snippetsfile = vscode.Uri.joinPath(extURI, 'schema', 'snippets.json').fsPath;
+		const ntwTemplate = vscode.Uri.joinPath(extURI, 'src', 'html', 'network.html.j2').fsPath;
+		const ntwOutput = vscode.Uri.joinPath(extURI, 'src', 'html', 'network.html').fsPath;
 		let snippets:JSON={} as JSON;
 		let url = "https://"+this.nspAddr+":"+this.port+"/wfm/api/v1/action";
 		const wfm_response: any = await this._callNSP(url,{method: 'GET',
@@ -1962,8 +1963,13 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 		});
 
-		var res = ny.render(templatePath, entries); // render the template with the entries
-		let fs = require("fs");
+		// Nunjucks FileSystemLoader rejects many absolute paths on Windows: it requires
+		// path.resolve(cwd, name) to still startWith(basePath) with a case-sensitive
+		// string check, which breaks when drive/path casing differs from cwd. Load file
+		// contents and use renderString so resolution does not depend on the loader.
+		const fs = require("fs");
+		const schemaTemplateSrc = fs.readFileSync(templatePath, "utf8");
+		var res = ny.renderString(schemaTemplateSrc, entries);
 		fs.writeFile(outpath, res, (err) => { 
 			if(err) { 
 				this.pluginLogs.error(err);
@@ -1971,7 +1977,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		});
 
 		ny.configure({ autoescape: false });
-		var ntwRender = ny.render(ntwTemplate, {"input": JSON.stringify(ntwActions)});
+		const ntwTemplateSrc = fs.readFileSync(ntwTemplate, "utf8");
+		var ntwRender = ny.renderString(ntwTemplateSrc, {"input": JSON.stringify(ntwActions)});
 		//ntwRender = ntwRender.replaceAll("&quot;",'"');
 		fs.writeFile(ntwOutput, ntwRender, (err) => { 
 			if(err) { 
@@ -1989,7 +1996,7 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 			}
 		});
 
-		const wfmSchema = outpath; // get the path to the schema
+		const wfmSchema = schemaOutUri.fsPath;
 		const workflowUri = "wfm:/workflows/*/*"; // get the uri for the workflow
 		let schemas = vscode.workspace.getConfiguration('yaml').get('schemas'); // get the schemas from the workspace
 		for (const key of Object.keys(schemas)) {
@@ -3540,8 +3547,8 @@ export class WorkflowManagerProvider implements vscode.FileSystemProvider, vscod
 		if (this.localsave===true) {
 			let fs = require("fs");
 			this.pluginLogs.info("[WFM]: Saving a backup locally in the temp folder "+this.localpath);
-			let extURI = vscode.Uri.parse("file://"+this.localpath);
-			let filepath = vscode.Uri.joinPath(extURI, name).toString().replace("file://","");
+			const baseUri = vscode.Uri.file(this.localpath);
+			const filepath = vscode.Uri.joinPath(baseUri, name).fsPath;
 			fs.writeFile(filepath, data, (err) => {
 				if(err) {
 					this.pluginLogs.error(err); 
