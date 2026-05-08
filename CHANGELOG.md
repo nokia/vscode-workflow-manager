@@ -323,8 +323,14 @@ ______
 - **Explorer refresh:** When **`workflowManager.enabled`** is disabled (Workflow Manager virtual folder not shown in the Explorer), internal updates still refresh the **WFM Files** tree but **no longer** run **Refresh Explorer** on the built-in **Files** view, avoiding automatic explorer refreshes while the Workflow Manager folder is absent from that view.
 - **YAML validation schema:** Regenerating the workflow JSON Schema no longer leaves duplicate Red Hat YAML schema associations for the same workflows. Stale entries keyed by older packaged-extension paths (`nokia.nokia-wfm`) are removed before applying the single generated `wfm-schema.json` mapping for `wfm:/workflows/*/*`, avoiding conflicting or repeated schemas on WFM YAML files.
 
-### [4.3.2]
+### [4.3.3]
 
 ### Bug fixes
 
 - Fixed issues with **Schema generation:** Issue with Nunjucks and absolute paths in Windows prevented from generating the schema for validation, while impact the action's validation view in the new container.
+
+### [4.4.0]
+
+### Network view (Beta) redesign
+
+- Changed the style, hierarchical layout and introduced light / dark themes.

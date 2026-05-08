@@ -1,24 +1,263 @@
 <!DOCTYPE html>
 		<html lang="en">
 		<head>
+			<meta charset="utf-8" />
 			<title>Network</title>
 			<!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src https://unpkg.com;">-->
+			<script>
+				(function () {
+					try {
+						var t = localStorage.getItem("network-theme");
+						document.documentElement.setAttribute("data-theme", t === "light" ? "light" : "dark");
+					} catch (e) {
+						document.documentElement.setAttribute("data-theme", "dark");
+					}
+				})();
+			</script>
 			<script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 			<style type="text/css">
+      :root {
+        --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        --radius: 12px;
+        --radius-sm: 8px;
+        --transition: 0.2s ease;
+      }
+
+      [data-theme="dark"] {
+        --color-bg: #0b0f14;
+        --color-surface: #111827;
+        --color-elevated: #161f2c;
+        --color-border: rgba(148, 163, 184, 0.14);
+        --color-border-strong: rgba(148, 163, 184, 0.28);
+        --color-text: #e8eef5;
+        --color-text-muted: #94a3b8;
+        --color-accent: #005aff;
+        --color-accent-hover: #3385ff;
+        --color-network-bg: #0d131c;
+        --color-network-border: rgba(96, 165, 250, 0.22);
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+        --shadow-md: 0 12px 40px rgba(0, 0, 0, 0.55);
+        --overlay-scrim: rgba(2, 6, 23, 0.55);
+        --slider-off: #475569;
+        --node-font: #f1f5f9;
+        --node-fill: #1e3a5f;
+      }
+
+      [data-theme="light"] {
+        --color-bg: #f1f5f9;
+        --color-surface: #ffffff;
+        --color-elevated: #ffffff;
+        --color-border: #e2e8f0;
+        --color-border-strong: #cbd5e1;
+        --color-text: #0f172a;
+        --color-text-muted: #64748b;
+        --color-accent: #005aff;
+        --color-accent-hover: #0046cc;
+        --color-network-bg: #ffffff;
+        --color-network-border: #cbd5e1;
+        --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+        --shadow-md: 0 12px 40px rgba(15, 23, 42, 0.1);
+        --overlay-scrim: rgba(15, 23, 42, 0.35);
+        --slider-off: #cbd5e1;
+        --node-font: #0f172a;
+        --node-fill: #124191;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        color-scheme: dark light;
+      }
+
+      html[data-theme="dark"] {
+        color-scheme: dark;
+      }
+
+      html[data-theme="light"] {
+        color-scheme: light;
+      }
+
       body {
-        background-color: #1A212D;
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--font-sans);
+        font-size: 15px;
+        line-height: 1.5;
+        background: var(--color-bg);
+        color: var(--color-text);
+        transition: background-color var(--transition), color var(--transition);
+      }
+
+      .app-shell {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px 24px 28px;
+      }
+
+      .app-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px 24px;
+        padding: 14px 18px;
+        margin-bottom: 18px;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+      }
+
+      .app-header__brand {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        min-width: 0;
+      }
+
+      .app-header__brand img {
+        display: block;
+        flex-shrink: 0;
+      }
+
+      .app-title {
+        margin: 0;
+        font-size: 1.125rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        color: var(--color-text);
+      }
+
+      .app-header__controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .control {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .control__label {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--color-text-muted);
+        white-space: nowrap;
+      }
+
+      .theme-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .theme-toggle__hint {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--color-text-muted);
+        user-select: none;
+      }
+
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 48px;
+        height: 28px;
+        flex-shrink: 0;
+      }
+
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--slider-off);
+        transition: background-color 0.25s ease;
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 22px;
+        width: 22px;
+        left: 3px;
+        bottom: 3px;
+        background-color: #fff;
+        transition: transform 0.25s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+      }
+
+      input:checked + .slider {
+        background-color: var(--color-accent);
+      }
+
+      input:focus-visible + .slider {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 2px;
+      }
+
+      input:checked + .slider:before {
+        transform: translateX(20px);
+      }
+
+      .slider.round {
+        border-radius: 34px;
+      }
+
+      .slider.round:before {
+        border-radius: 50%;
+      }
+
+      .network-frame {
+        position: relative;
+        width: 100%;
+        margin-bottom: 20px;
+        border-radius: var(--radius);
+        border: 1px solid var(--color-network-border);
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+        transition: border-color var(--transition), box-shadow var(--transition);
       }
 
 			#mynetwork {
-        background-color: #252E38;
+        background-color: var(--color-network-bg);
 				width: 100%;
-				height: 600px;
-        border: 2px solid #d8e6ff;
-        border-radius: 12px;
-        margin-top: 20px;
-        margin-bottom: 20px;
+				min-height: 160px;
+        height: min(600px, 70vh);
+        border: none;
+        border-radius: 0;
+        margin: 0;
+        box-shadow: none;
+        transition: background-color var(--transition);
 			}
-      * {box-sizing: border-box;}
+
+      /* Bottom hit-area: hover shows ns-resize cursor; drag to change height */
+      .network-resize-edge {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 14px;
+        z-index: 2;
+        cursor: ns-resize;
+        touch-action: none;
+        background: transparent;
+      }
 
 /* Button used to open the contact form - fixed at the bottom of the page */
 .open-button {
@@ -40,15 +279,17 @@
   position: fixed;
   bottom: 0;
   right: 15px;
-  border: 3px solid #f1f1f1;
+  border: 1px solid var(--color-border);
   z-index: 9;
+  border-radius: var(--radius-sm);
 }
 
 /* Add styles to the form container */
 .form-container {
   max-width: 300px;
   padding: 10px;
-  background-color: white;
+  background-color: var(--color-surface);
+  color: var(--color-text);
 }
 
 /* Full-width input fields */
@@ -56,204 +297,198 @@
   width: 100%;
   padding: 15px;
   margin: 5px 0 22px 0;
-  border: none;
-  background: #f1f1f1;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-elevated);
+  color: var(--color-text);
 }
 
-.switch {
-  position: absolute;
-  right: 15px;
-  top: 25px;
-  display: inline-block;
-  width: 60px;
-  height: 34px;
-}
-
-.switch input { 
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  -webkit-transition: .4s;
-  transition: .4s;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 26px;
-  width: 26px;
-  left: 4px;
-  bottom: 4px;
-  background-color: white;
-  -webkit-transition: .4s;
-  transition: .4s;
-}
-
-input:checked + .slider {
-  background-color: #0059ff;
-}
-
-input:focus + .slider {
-  box-shadow: 0 0 1px #0059ff;
-}
-
-input:checked + .slider:before {
-  -webkit-transform: translateX(26px);
-  -ms-transform: translateX(26px);
-  transform: translateX(26px);
-}
-
-/* Rounded sliders */
-.slider.round {
-  border-radius: 34px;
-}
-
-.slider.round:before {
-  border-radius: 50%;
+.action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 
 .button {
-  background-color: #04AA6D; /* Green */
-  width: calc(17% - 4px);
-  margin-left: 2.5%;
-  border: none;
-  border-radius: 12px;
-  color: white;
-  padding-top: 10px;
-  padding-bottom: 10px;
+  background-color: var(--color-surface);
+  min-width: 44px;
+  padding: 10px 14px;
+  margin-left: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent);
   text-align: center;
   text-decoration: none;
-  display: inline-block;
-  font-size: 16px;
-  transition-duration: 0.4s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-family: inherit;
+  font-weight: 600;
+  transition: background-color var(--transition), color var(--transition), border-color var(--transition), box-shadow var(--transition);
   cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.button:hover {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-md);
 }
 
 .buttonGreyed {
-  background-color: #999999; 
-  color: white; 
-  border: 2px solid black;
+  background-color: var(--color-elevated);
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+
+.buttonGreyed:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
 }
 
 .button2 {
-  background-color: white; 
-  color: #015AFF; 
-  border: 2px solid #015AFF;
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-surface);
 }
 
 .button2:hover {
-  background-color: #015AFF;
-  color: white;
+  background-color: var(--color-accent);
+  color: #fff;
 }
 
 .button3 {
-  background-color: white; 
-  color: #00b737; 
-  border: 2px solid #00b737;
+  color: #059669;
+  border-color: #059669;
+  background: var(--color-surface);
 }
 
 .button3:hover {
-  background-color: #00b737;
-  color: white;
+  background-color: #059669;
+  color: #fff;
 }
 
 .button1 {
-  background-color: white; 
-  color: #d5402e; 
-  border: 2px solid #d5402e;
+  color: #dc2626;
+  border-color: #dc2626;
+  background: var(--color-surface);
 }
 
 .button1:hover {
-  background-color: #d5402e;
-  color: white;
+  background-color: #dc2626;
+  color: #fff;
 }
 
 /* The Modal (background) */
 .modal {
-  display: none; /* Hidden by default */
-  position: fixed; /* Stay in place */
-  z-index: 1; /* Sit on top */
+  display: none;
+  position: fixed;
+  z-index: 1000;
   left: 0;
   top: 0;
-  width: 100%; /* Full width */
-  height: 100%; /* Full height */
-  overflow: auto; /* Enable scroll if needed */
-  background-color: rgb(0,0,0); /* Fallback color */
-  background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
-  -webkit-animation-name: fadeIn; /* Fade in the background */
-  -webkit-animation-duration: 0.4s;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: var(--overlay-scrim);
+  -webkit-animation-name: fadeIn;
+  -webkit-animation-duration: 0.35s;
   animation-name: fadeIn;
-  animation-duration: 0.4s
+  animation-duration: 0.35s;
 }
 
 /* Modal Content */
 .modal-content {
   position: fixed;
   bottom: 0;
-  background-color: #fefefe;
+  left: 0;
+  right: 0;
+  background-color: var(--color-surface);
   width: 100%;
+  max-height: 92vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius) var(--radius) 0 0;
+  border: 1px solid var(--color-border);
+  border-bottom: none;
+  box-shadow: var(--shadow-md);
   -webkit-animation-name: slideIn;
-  -webkit-animation-duration: 0.4s;
+  -webkit-animation-duration: 0.35s;
   animation-name: slideIn;
-  animation-duration: 0.4s;
-  font-family: Arial, Helvetica, sans-serif;
+  animation-duration: 0.35s;
+  font-family: var(--font-sans);
 }
 
 /* The Close Button */
 .close {
-  color: white;
+  color: rgba(255, 255, 255, 0.92);
   float: right;
-  font-size: 28px;
-  font-weight: bold;
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1;
+  opacity: 0.9;
 }
 
 .close:hover,
 .close:focus {
-  color: #000;
+  opacity: 1;
   text-decoration: none;
   cursor: pointer;
 }
 
 .modal-header {
-  padding: 2px 16px;
-  background-color: #1A212D;
-  color: white;
-  border-bottom: #ccc solid 1px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #f8fafc;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .modal-header {
+  background: linear-gradient(135deg, #124191 0%, #005aff 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
 }
 
 .modal-body {
-  padding: 2px 16px;
-  padding-top: 15px;
-  height: 160px;
-  background-color: #252E38;
-  color: white;
+  padding: 16px 18px;
+  padding-top: 16px;
+  min-height: 160px;
+  background-color: var(--color-elevated);
+  color: var(--color-text);
+  overflow: auto;
+  flex: 1;
 }
 
 .modal-footer {
-  padding: 2px 16px;
-  background-color: #1A212D;
-  color: white;
+  padding: 12px 18px;
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border);
+  font-size: 0.875rem;
+  flex-shrink: 0;
 }
 
-label{
-  color: white;
-  font-size: 16px;
+.modal-footer h3 {
+  margin: 0;
+  font-weight: 500;
+}
+
+label {
+  color: var(--color-text);
+  font-size: 14px;
   margin-left: 10px;
 }
 
 /* Add Animation */
 @-webkit-keyframes slideIn {
-  from {bottom: -300px; opacity: 0} 
+  from {bottom: -300px; opacity: 0}
   to {bottom: 0; opacity: 1}
 }
 
@@ -263,50 +498,85 @@ label{
 }
 
 @-webkit-keyframes fadeIn {
-  from {opacity: 0} 
+  from {opacity: 0}
   to {opacity: 1}
 }
 
 @keyframes fadeIn {
-  from {opacity: 0} 
+  from {opacity: 0}
   to {opacity: 1}
 }
 
 input[type=text], select, textarea {
   width: 30%;
-  padding: 6px 10px;
+  max-width: 100%;
+  padding: 8px 12px;
   margin: 8px 0;
   display: inline-block;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
   box-sizing: border-box;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 14px;
 }
 
 .btn {
-  width: 30%;
-  background-color: #0056a3;
-  color: white;
-  padding: 6px 10px;
+  width: auto;
+  min-width: 120px;
+  background-color: var(--color-accent);
+  color: #fff;
+  padding: 8px 16px;
   margin: 8px 0;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background-color var(--transition);
 }
 
 .btn:hover {
-  background-color: #005AFF;
+  background-color: var(--color-accent-hover);
 }
 
 
 			</style>
 		</head>
 		<body>
-      <img src="https://www.nokia.com/themes/custom/onenokia_reskin/logo-white.svg" height="40" style="margin-top: 20px;"/>
-      <label class="switch">
-      <input type="checkbox" id="hierarchyCheck" onclick="hierarchy()" checked>
-        <span class="slider round"></span>
-      </label>
+      <div class="app-shell">
+      <header class="app-header">
+        <div class="app-header__brand">
+          <img id="brandLogo" src="https://www.nokia.com/themes/custom/onenokia_reskin/logo-white.svg" height="36" alt="Nokia" />
+          <h1 class="app-title">Workflow graph</h1>
+        </div>
+        <div class="app-header__controls">
+          <div class="control">
+            <span class="control__label">Hierarchy</span>
+            <label class="switch" title="Hierarchical layout">
+              <input type="checkbox" id="hierarchyCheck" onclick="hierarchy()" checked />
+              <span class="slider round"></span>
+            </label>
+          </div>
+          <div class="control">
+            <span class="control__label">Appearance</span>
+            <div class="theme-toggle">
+              <span class="theme-toggle__hint">Light</span>
+              <label class="switch" title="Dark theme">
+                <input type="checkbox" id="themeCheck" onchange="applyTheme()" />
+                <span class="slider round"></span>
+              </label>
+              <span class="theme-toggle__hint">Dark</span>
+            </div>
+          </div>
+        </div>
+      </header>
+			<div class="network-frame">
 			<div id="mynetwork"></div>
+      <div class="network-resize-edge" title="Drag to resize height" aria-label="Resize workflow graph height"></div>
+      </div>
       <div id="myModal" class="modal">
         <!-- Modal content -->
         <div class="modal-content">
@@ -379,12 +649,14 @@ input[type=text], select, textarea {
           </div>
         </div>
       </div>
+      <div class="action-bar">
       <button class="button button2" title="Add task" onclick="openTaskForm()"><b>&#10753;</b></button>
       <button class="button buttonGreyed" title="Remove task"  id="deleteTask" onclick="deleteTask()"><b>&#10754;</b></button>
       <button class="button buttonGreyed" title="Remove link" id="deleteEdge" onclick="deleteEdge()"><b>&#8655;</b></button>
       <button class="button button2" title="Workflow Output" id="outputButton" onclick="openTaskFormOutput()"><b>&#8960;</b></button>
       <button class="button button3" title="Generate" onclick="generate()"><b>&#8682;</b></button>
-
+      </div>
+      </div>
 
 			<script type="text/javascript">
 			// create an array with nodes
@@ -395,6 +667,51 @@ input[type=text], select, textarea {
         - with-items support
         - output
       */
+
+
+      var LOGO_LIGHT_SRC = "https://www.nokia.com/themes/custom/onenokia_reskin/logo.svg";
+
+      function getVisNodeColors() {
+        var style = getComputedStyle(document.documentElement);
+        return {
+          fontColor: (style.getPropertyValue("--node-font") || "#f1f5f9").trim(),
+          nodeBg: (style.getPropertyValue("--node-fill") || "#1e3a5f").trim(),
+        };
+      }
+
+      function themeIsDark() {
+        return document.documentElement.getAttribute("data-theme") !== "light";
+      }
+
+      function syncBrandLogo() {
+        var img = document.getElementById("brandLogo");
+        if (!img) return;
+        img.src = themeIsDark()
+          ? "https://www.nokia.com/themes/custom/onenokia_reskin/logo-white.svg"
+          : LOGO_LIGHT_SRC;
+        img.height = 36;
+      }
+
+      function applyTheme() {
+        var dark = document.getElementById("themeCheck").checked;
+        document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+        try {
+          localStorage.setItem("network-theme", dark ? "dark" : "light");
+        } catch (e) {}
+        syncBrandLogo();
+        if (typeof network !== "undefined") {
+          var vc = getVisNodeColors();
+          network.setOptions({
+            nodes: {
+              font: { size: 18, color: vc.fontColor },
+              color: { background: vc.nodeBg },
+            },
+          });
+        }
+      }
+
+      document.getElementById("themeCheck").checked = themeIsDark();
+      syncBrandLogo();
 
       hideDeleteTask();
       hideDeleteEdge();
@@ -434,28 +751,55 @@ input[type=text], select, textarea {
       var connectedInput = "";
       
 			// create a network
+      function defaultNetworkHeightPx() {
+        return Math.min(600, Math.floor(window.innerHeight * 0.7));
+      }
+
+      function readStoredNetworkHeight() {
+        try {
+          var s = localStorage.getItem("network-panel-height");
+          if (s == null) return null;
+          var n = parseInt(s, 10);
+          return isNaN(n) ? null : n;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function clampNetworkHeight(h) {
+        var min = 160;
+        var max = Math.max(min + 80, window.innerHeight - 72);
+        return Math.min(max, Math.max(min, Math.round(h)));
+      }
+
+			// create a network
 			var container = document.getElementById("mynetwork");
+      var initialNetH = readStoredNetworkHeight();
+      if (initialNetH == null) initialNetH = defaultNetworkHeightPx();
+      container.style.height = clampNetworkHeight(initialNetH) + "px";
 			var data = {
 				nodes: nodes,
 				edges: edges,
 			};
 			// var options = {};
+      var vc = getVisNodeColors();
 			const options = {
 				manipulation: false,
 				height: "100%",
         nodes: {
           font: {
             size: 18,
-            color: "#ffffff"
+            color: vc.fontColor
           },
           color: {
-            background: "#002D7F"
+            background: vc.nodeBg
           }
         },
 				layout: {
 					hierarchical: {
 					enabled: true,
 					levelSeparation: 100,
+          shakeTowards: "roots"
 					},
 				},
 				physics: {
@@ -479,6 +823,95 @@ input[type=text], select, textarea {
       }
 
 			var network = new vis.Network(container, data, options);
+
+      (function setupNetworkVerticalResize() {
+        var edge = document.querySelector(".network-resize-edge");
+        if (!edge || !container) return;
+
+        function redrawNetwork() {
+          try {
+            network.redraw();
+          } catch (e) {}
+        }
+
+        var startY = 0;
+        var startH = 0;
+        var raf = 0;
+
+        function applyHeightPx(px) {
+          px = clampNetworkHeight(px);
+          container.style.height = px + "px";
+          try {
+            localStorage.setItem("network-panel-height", String(px));
+          } catch (e) {}
+          cancelAnimationFrame(raf);
+          raf = requestAnimationFrame(redrawNetwork);
+        }
+
+        function endDrag() {
+          document.removeEventListener("mousemove", onMouseMove);
+          document.removeEventListener("mouseup", onMouseUp);
+          document.removeEventListener("touchmove", onTouchMove);
+          document.removeEventListener("touchend", onTouchEnd);
+          document.removeEventListener("touchcancel", onTouchEnd);
+          document.body.style.userSelect = "";
+          document.body.style.cursor = "";
+          redrawNetwork();
+        }
+
+        function onMouseMove(e) {
+          applyHeightPx(startH + (e.clientY - startY));
+        }
+
+        function onMouseUp() {
+          endDrag();
+        }
+
+        function onTouchMove(e) {
+          if (e.touches.length !== 1) return;
+          applyHeightPx(startH + (e.touches[0].clientY - startY));
+        }
+
+        function onTouchEnd() {
+          endDrag();
+        }
+
+        function beginDrag(clientY) {
+          startY = clientY;
+          startH = container.getBoundingClientRect().height;
+          document.addEventListener("mousemove", onMouseMove);
+          document.addEventListener("mouseup", onMouseUp);
+          document.addEventListener("touchmove", onTouchMove, { passive: false });
+          document.addEventListener("touchend", onTouchEnd);
+          document.addEventListener("touchcancel", onTouchEnd);
+          document.body.style.userSelect = "none";
+          document.body.style.cursor = "ns-resize";
+        }
+
+        edge.addEventListener("mousedown", function (e) {
+          if (e.button !== 0) return;
+          e.preventDefault();
+          beginDrag(e.clientY);
+        });
+
+        edge.addEventListener("touchstart", function (e) {
+          if (e.touches.length !== 1) return;
+          e.preventDefault();
+          beginDrag(e.touches[0].clientY);
+        }, { passive: false });
+
+        window.addEventListener("resize", function () {
+          var h = container.getBoundingClientRect().height;
+          var c = clampNetworkHeight(h);
+          if (c !== h) {
+            container.style.height = c + "px";
+            try {
+              localStorage.setItem("network-panel-height", String(c));
+            } catch (err) {}
+            redrawNetwork();
+          }
+        });
+      })();
 
       network.on("click", function (params) {
         params.event = "[original event]";
@@ -816,15 +1249,32 @@ input[type=text], select, textarea {
 					  hierarchical: {
 					  enabled: true,
 					  levelSeparation: 100,
+            sortMethod: "directed",
+            shakeTowards: "roots"
 					  },
-				  }};
+				  },
+          physics: {
+            enabled: false
+          }
+          };
           network.setOptions(aux);
         } else {
-          var aux = {layout: {
-					  hierarchical: {
-					  enabled: false,
-					  },
-				  }};
+          var aux = {
+            layout: {
+              hierarchical: {
+              enabled: false
+              },
+            }
+          };
+          network.setOptions(aux);
+          aux = {
+            physics: {
+              enabled: true,
+              hierarchicalRepulsion: {
+              nodeDistance: 100,
+              },
+            },
+          };
           network.setOptions(aux);
         }
       }
